@@ -239,7 +239,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             "No numbers whitelisted",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
                         )
                     } else {
                         whitelisted.forEach { entry ->
