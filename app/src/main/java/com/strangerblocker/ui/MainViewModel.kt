@@ -160,6 +160,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
 
+    val updateAvailable: StateFlow<Boolean> = _updateInfo.map { it != null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _updateDownloading = MutableStateFlow(false)
     val updateDownloading: StateFlow<Boolean> = _updateDownloading.asStateFlow()
 
@@ -202,6 +205,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _updateDownloading.value = false
             }
         }
+    }
+
+    // ── Dialogs ──
+
+    val showAboutDialog = MutableStateFlow(false)
+    val showUpdateDialog = MutableStateFlow(false)
+    val showAddWhitelistDialog = MutableStateFlow(false)
+
+    fun openAboutDialog() { showAboutDialog.value = true }
+    fun closeAboutDialog() { showAboutDialog.value = false }
+
+    fun openUpdateDialog() { showUpdateDialog.value = true }
+    fun closeUpdateDialog() { showUpdateDialog.value = false }
+
+    fun openAddWhitelistDialog() { showAddWhitelistDialog.value = true }
+    fun closeAddWhitelistDialog() { showAddWhitelistDialog.value = false }
+
+    // ── Whitelist input state ──
+
+    val whitelistInputNumber = MutableStateFlow("")
+    val whitelistInputLabel = MutableStateFlow("")
+
+    fun confirmAddWhitelist() {
+        val number = whitelistInputNumber.value.trim()
+        if (number.isBlank()) return
+        viewModelScope.launch {
+            db.whitelistedNumberDao().insert(
+                WhitelistedNumber(
+                    phoneNumber = number,
+                    label = whitelistInputLabel.value.trim().takeIf { it.isNotBlank() },
+                    addedAtMillis = System.currentTimeMillis(),
+                )
+            )
+        }
+        whitelistInputNumber.value = ""
+        whitelistInputLabel.value = ""
+        showAddWhitelistDialog.value = false
     }
 
     // ── Actions ──
