@@ -1,6 +1,5 @@
 package com.strangerblocker.service
 
-import android.content.ContentResolver
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
@@ -72,22 +71,23 @@ class CallBlockerService : CallScreeningService() {
      * Query ContactsContract to determine if [number] belongs to a
      * known contact. Returns true if at least one matching contact row
      * exists.
+     *
+     * If the app lacks READ_CONTACTS permission, defaults to false
+     * (unknown) so the call gets rejected — safe fail-closed.
      */
     private fun isNumberInContacts(number: String): Boolean {
-        val resolvedNumber = Uri.encode(number)
-        val uri = Uri.parse(
-            "content://com.android.contacts/data/phones/filter/$resolvedNumber"
-        )
-        return queryHasRows(contentResolver, uri)
-    }
-
-    /** Simple check if a content URI query returns at least one row. */
-    private fun queryHasRows(cr: ContentResolver, uri: Uri): Boolean {
-        // Projection with one column for minimal overhead
-        val projection = arrayOf(ContactsContract.Data._ID)
-        cr.query(uri, projection, null, null, null)?.use { cursor ->
-            return cursor.count > 0
+        return try {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(number),
+            )
+            val projection = arrayOf(ContactsContract.PhoneLookup._ID)
+            contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                cursor.count > 0
+            } ?: false
+        } catch (_: SecurityException) {
+            // READ_CONTACTS not granted — can't verify, so treat as unknown
+            false
         }
-        return false
     }
 }

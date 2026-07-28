@@ -1,30 +1,40 @@
 package com.strangerblocker
 
+import android.Manifest
 import android.app.role.RoleManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.strangerblocker.ui.MainScreen
 import com.strangerblocker.ui.theme.StrangerBlockerTheme
 
 class MainActivity : ComponentActivity() {
 
-    /** Request launcher for ROLE_CALL_SCREENING grant. */
     private val roleRequestLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
-    ) { /* result — user returned from role grant screen; UI refreshes on resume */ }
+    ) { onResume() }
+
+    private val contactsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        // Permission state is visible in the UI banner; no further action needed.
+        // If denied, the service gracefully falls back to blocking all unknown
+        // numbers (safe default).
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // If the role is not held, prompt the user on first launch.
         if (!isRoleHeld()) {
             requestCallScreeningRole()
         }
+        requestContactsPermission()
 
         setContent {
             StrangerBlockerTheme {
@@ -35,8 +45,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Role state may have changed while we were away — the ViewModel
-        // refresh is handled internally via its own lifecycle awareness.
     }
 
     private fun isRoleHeld(): Boolean {
@@ -51,6 +59,15 @@ class MainActivity : ComponentActivity() {
         )
         if (intent != null) {
             roleRequestLauncher.launch(intent)
+        }
+    }
+
+    private fun requestContactsPermission() {
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.READ_CONTACTS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
         }
     }
 }
