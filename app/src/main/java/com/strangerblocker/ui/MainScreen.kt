@@ -246,16 +246,16 @@ private fun BlockedCallRow(call: com.strangerblocker.data.BlockedCall) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = call.callerName ?: "Unknown",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = call.phoneNumber,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = call.phoneNumber,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
+                    text = "Blocked",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

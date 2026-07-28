@@ -17,6 +17,15 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        create("ci") {
+            storeFile = rootProject.file("ci.keystore")
+            storePassword = System.getenv("CI_KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = System.getenv("CI_KEY_ALIAS") ?: "strangerblocker"
+            keyPassword = System.getenv("CI_KEY_PASSWORD") ?: "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -24,10 +33,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("ci")
         }
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("ci")
         }
     }
 

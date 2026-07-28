@@ -26,6 +26,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Blocked-call history, observed live from Room. */
     val blockedCalls: Flow<List<BlockedCall>> = db.blockedCallDao().observeAll()
 
+    init {
+        // Auto-prune entries older than 30 days on every launch
+        viewModelScope.launch {
+            val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+            db.blockedCallDao().deleteOlderThan(thirtyDaysAgo)
+        }
+    }
+
     /** Toggle state. */
     val isBlockingEnabled: StateFlow<Boolean> = MutableStateFlow(
         prefs.getBoolean("blocking_enabled", true)

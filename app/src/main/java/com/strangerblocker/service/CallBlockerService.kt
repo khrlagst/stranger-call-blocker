@@ -1,12 +1,10 @@
 package com.strangerblocker.service
 
 import android.content.ContentResolver
-import android.database.Cursor
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallScreeningService
-import android.telecom.TelecomManager
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import kotlinx.coroutines.CoroutineScope
@@ -51,14 +49,12 @@ class CallBlockerService : CallScreeningService() {
                     .build(),
             )
 
-            // Persist to block history
-            val displayName = lookupContactName(phoneNumber)
+            // Persist to block history (number + timestamp only — no contact names)
             scope.launch {
                 val db = (applicationContext as StrangerBlockerApp).db
                 db.blockedCallDao().insert(
                     BlockedCall(
                         phoneNumber = phoneNumber,
-                        callerName = displayName,
                         blockedAtMillis = System.currentTimeMillis(),
                     )
                 )
@@ -83,25 +79,6 @@ class CallBlockerService : CallScreeningService() {
             "content://com.android.contacts/data/phones/filter/$resolvedNumber"
         )
         return queryHasRows(contentResolver, uri)
-    }
-
-    /**
-     * Resolve the display name for a phone number from the contacts
-     * provider. Returns null if not found.
-     */
-    private fun lookupContactName(number: String): String? {
-        val resolvedNumber = Uri.encode(number)
-        val uri = Uri.withAppendedPath(
-            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-            resolvedNumber,
-        )
-        val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
-
-        return contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.PhoneLookup.DISPLAY_NAME))
-            } else null
-        }
     }
 
     /** Simple check if a content URI query returns at least one row. */

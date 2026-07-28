@@ -19,4 +19,8 @@ interface BlockedCallDao {
     /** Delete all history. */
     @Query("DELETE FROM blocked_calls")
     suspend fun clearAll()
+
+    /** Purge entries older than [cutoff] millis (e.g. 30 days). */
+    @Query("DELETE FROM blocked_calls WHERE blockedAtMillis < :cutoff")
+    suspend fun deleteOlderThan(cutoff: Long)
 }

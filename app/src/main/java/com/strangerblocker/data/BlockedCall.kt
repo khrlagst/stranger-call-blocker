@@ -7,8 +7,6 @@ import androidx.room.PrimaryKey
 data class BlockedCall(
     /** Phone number of the blocked caller (raw from telecom). */
     val phoneNumber: String,
-    /** Display name resolved from Contacts, or null if unknown. */
-    val callerName: String?,
     /** Epoch millis when the call was blocked. */
     val blockedAtMillis: Long,
 ) {
