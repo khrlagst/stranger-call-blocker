@@ -138,7 +138,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp),
+                .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
         ) {
             Spacer(Modifier.height(8.dp))
 
@@ -276,14 +276,23 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            "Blocked",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                            ),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f),
-                        )
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Blocked",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            if (totalBlocked > 0) {
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "$totalBlocked calls",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                         if (totalBlocked > 0) {
                             IconButton(onClick = { viewModel.exportCsv() }) {
                                 Icon(Icons.Default.FileDownload, contentDescription = "Export CSV")

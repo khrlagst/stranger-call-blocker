@@ -171,7 +171,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .getPackageInfo(ctx.packageName, 0)
                     .versionName ?: "0.0.0"
                 val info = UpdateChecker.check() ?: return@launch
-                if (info.isNewerThan(currentVer)) {
+                if (info.isNewerThan(currentVer) && info.latestVersion != currentVer) {
                     _updateInfo.value = info
                 }
             } catch (_: Exception) {
