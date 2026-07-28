@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stranger Blocker</string>
+    <string name="toggle_label">Block unknown callers</string>
+    <string name="toggle_on_desc">Blocking is enabled — unknown callers will be rejected</string>
+    <string name="toggle_off_desc">Blocking is disabled — all calls ring through</string>
+    <string name="blocked_log_title">Blocked Calls</string>
+    <string name="no_blocked_calls">No blocked calls yet</string>
+    <string name="blocked_caller_unknown">Unknown</string>
+    <string name="role_grant_title">Enable Call Screening</string>
+    <string name="role_grant_message">Stranger Blocker needs the Call Screening role to intercept incoming calls. Grant it on the next screen.</string>
+    <string name="role_grant_action">Grant Access</string>
+    <string name="role_already_granted">Call Screening is active</string>
+    <string name="role_not_granted">Call Screening is not granted</string>
+</resources>
