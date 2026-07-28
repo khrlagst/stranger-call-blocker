@@ -8,15 +8,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
@@ -25,7 +28,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -53,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -84,8 +88,19 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 
     Scaffold(
         topBar = {
-            Column(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, bottom = 8.dp)) {
-                Text("Stranger Blocker", style = MaterialTheme.typography.titleLarge)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(start = 20.dp, top = 12.dp, bottom = 8.dp),
+            ) {
+                Text(
+                    "Stranger Blocker",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 if (totalBlocked > 0) {
                     Text(
                         "$totalBlocked blocked",
@@ -94,6 +109,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     )
                 }
             }
+            HorizontalDivider(thickness = 1.dp)
         },
     ) { innerPadding ->
         Column(
@@ -102,35 +118,14 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 .padding(innerPadding)
                 .padding(horizontal = 20.dp),
         ) {
-            // ── Role status ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { viewModel.refreshRoleStatus() }
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isRoleHeld) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.error
-                        )
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (isRoleHeld) "Call screening active"
-                    else "Call screening not granted",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Spacer(Modifier.height(8.dp))
+
+            // ── Role badge ──
+            RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
 
             // ── Update banner ──
             if (updateInfo != null) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 UpdateBanner(
                     version = updateInfo!!.latestVersion,
                     downloading = updateDownloading,
@@ -147,7 +142,12 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Block strangers", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Block strangers",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
                     Text(
                         if (isBlockingEnabled) "Unknown numbers are silently rejected"
                         else "All calls ring through",
@@ -165,114 +165,144 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // ── Whitelist ──
-            Row(
+            // ── Whitelist card ──
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+                border = CardDefaults.outlinedCardBorder(),
             ) {
-                Text(
-                    "Whitelist",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                )
-                if (whitelisted.isNotEmpty()) {
-                    Text(
-                        "${whitelisted.size}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = { showAddWhitelistDialog = true }) {
-                    Icon(
-                        Icons.Default.Add, contentDescription = "Add to whitelist",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            if (whitelisted.isEmpty()) {
-                Text(
-                    "No numbers whitelisted",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            } else {
-                whitelisted.forEach { entry ->
-                    WhitelistRow(
-                        number = entry.phoneNumber,
-                        label = entry.label,
-                        onRemove = { viewModel.removeFromWhitelist(entry.phoneNumber) },
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-            // ── Blocked calls header ──
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Blocked",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                )
-                if (totalBlocked > 0) {
-                    IconButton(onClick = { viewModel.exportCsv() }) {
-                        Icon(Icons.Default.FileDownload, contentDescription = "Export CSV")
-                    }
-                    IconButton(onClick = viewModel::clearHistory) {
-                        Icon(Icons.Default.ClearAll, contentDescription = "Clear history")
-                    }
-                }
-            }
-
-            // ── Blocked calls list ──
-            if (groupedCalls.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.Shield, contentDescription = null,
-                            modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        )
-                        Spacer(Modifier.height(8.dp))
+                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(
-                            "No blocked calls yet",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            "Whitelist",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f),
                         )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                ) {
-                    groupedCalls.forEach { group ->
-                        item(key = "header_${group.header}") {
+                        if (whitelisted.isNotEmpty()) {
                             Text(
-                                group.header,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                                "${whitelisted.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        items(group.calls, key = { it.id }) { call ->
-                            BlockedCallRow(
-                                call = call,
-                                onWhitelist = {
-                                    viewModel.addToWhitelist(call.phoneNumber, null)
-                                },
+                        IconButton(onClick = { showAddWhitelistDialog = true }) {
+                            Icon(
+                                Icons.Default.Add, contentDescription = "Add to whitelist",
+                                tint = MaterialTheme.colorScheme.primary,
                             )
-                            HorizontalDivider()
+                        }
+                    }
+                    if (whitelisted.isEmpty()) {
+                        Text(
+                            "No numbers whitelisted",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    } else {
+                        whitelisted.forEach { entry ->
+                            WhitelistRow(
+                                number = entry.phoneNumber,
+                                label = entry.label,
+                                onRemove = { viewModel.removeFromWhitelist(entry.phoneNumber) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── Blocked calls card ──
+            Card(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+                border = CardDefaults.outlinedCardBorder(),
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    // Header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Blocked",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (totalBlocked > 0) {
+                            IconButton(onClick = { viewModel.exportCsv() }) {
+                                Icon(Icons.Default.FileDownload, contentDescription = "Export CSV")
+                            }
+                            IconButton(onClick = viewModel::clearHistory) {
+                                Icon(Icons.Default.ClearAll, contentDescription = "Clear history")
+                            }
+                        }
+                    }
+
+                    // List
+                    if (groupedCalls.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.Shield, contentDescription = null,
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "No blocked calls yet",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                        ) {
+                            groupedCalls.forEach { group ->
+                                item(key = "header_${group.header}") {
+                                    Text(
+                                        group.header,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(
+                                            start = 12.dp, top = 8.dp, bottom = 2.dp,
+                                        ),
+                                    )
+                                }
+                                items(group.calls, key = { it.id }) { call ->
+                                    BlockedCallRow(
+                                        call = call,
+                                        onWhitelist = {
+                                            viewModel.addToWhitelist(call.phoneNumber, null)
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -294,26 +324,61 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 // ── Sub-components ──
 
 @Composable
+private fun RoleBadge(isActive: Boolean, onTap: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (isActive) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        } else {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.08f)
+        },
+        modifier = Modifier.clickable(onClick = onTap),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isActive) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error
+                    )
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (isActive) "Active" else "Inactive",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isActive) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
 private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             Icons.Default.PersonAdd, contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 number,
-                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             )
             if (label != null) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -321,8 +386,8 @@ private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
         IconButton(onClick = onRemove) {
             Icon(
                 Icons.Default.Delete, contentDescription = "Remove",
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
         }
     }
@@ -332,36 +397,42 @@ private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
 private fun BlockedCallRow(call: BlockedCall, onWhitelist: () -> Unit) {
     val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             Icons.Default.Block, contentDescription = null,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(14.dp),
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 call.phoneNumber,
-                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 dateFormat.format(Date(call.blockedAtMillis)),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         IconButton(onClick = onWhitelist) {
             Icon(
                 Icons.Default.PersonAdd, contentDescription = "Whitelist",
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
         }
     }
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 36.dp),
+        thickness = 0.5.dp,
+    )
 }
 
 @Composable
@@ -405,35 +476,36 @@ private fun AddWhitelistDialog(onDismiss: () -> Unit, onAdd: (String, String?) -
 private fun UpdateBanner(version: String, downloading: Boolean, onUpdate: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
         ),
         onClick = { if (!downloading) onUpdate() },
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 Icons.Default.Download, contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     "Update v$version available",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
                     if (downloading) "Downloading\u2026" else "Tap to download & install",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (downloading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
                 )
             }
