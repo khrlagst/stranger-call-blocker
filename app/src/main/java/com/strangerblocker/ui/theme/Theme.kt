@@ -18,7 +18,7 @@ private val LightColorScheme = lightColorScheme(
     error = LightError,
     secondary = LightPrimary,
     onSecondary = LightOnPrimary,
-    tertiary = LightPrimary,
+    tertiary = LightPrimaryDark,
     onTertiary = LightOnPrimary,
 )
 
@@ -34,7 +34,7 @@ private val DarkColorScheme = darkColorScheme(
     error = DarkError,
     secondary = DarkPrimary,
     onSecondary = DarkOnPrimary,
-    tertiary = DarkPrimary,
+    tertiary = DarkPrimaryDark,
     onTertiary = DarkOnPrimary,
 )
 
