@@ -235,7 +235,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 ),
                 border = CardDefaults.outlinedCardBorder(),
             ) {
-                Column(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxSize()) {
                     // Header
                     Row(
                         modifier = Modifier
@@ -264,7 +264,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     // List
                     if (groupedCalls.isEmpty()) {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center,
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -283,7 +283,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         }
                     } else {
                         LazyColumn(
-                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            modifier = Modifier.fillMaxSize(),
                         ) {
                             groupedCalls.forEach { group ->
                                 item(key = "header_${group.header}") {
