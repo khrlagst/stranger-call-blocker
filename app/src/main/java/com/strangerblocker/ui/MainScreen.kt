@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
@@ -80,6 +81,12 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val updateDownloading by viewModel.updateDownloading.collectAsState()
     val context = LocalContext.current
     var showAddWhitelistDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
+    val appVersion = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+        } catch (_: Exception) { "?" }
+    }
 
     LaunchedEffect(exportIntent) {
         exportIntent?.let {
@@ -90,28 +97,41 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 
     Scaffold(
         topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(start = 20.dp, top = 12.dp, bottom = 8.dp),
-            ) {
-                Text(
-                    "Stranger Blocker",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                if (totalBlocked > 0) {
-                    Text(
-                        "$totalBlocked blocked",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Stranger Blocker",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        if (totalBlocked > 0) {
+                            Text(
+                                "$totalBlocked blocked",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = { showAboutDialog = true }) {
+                        Icon(
+                            Icons.Default.Info, contentDescription = "About",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
+                HorizontalDivider(thickness = 1.dp)
             }
-            HorizontalDivider(thickness = 1.dp)
         },
     ) { innerPadding ->
         Column(
@@ -122,8 +142,15 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         ) {
             Spacer(Modifier.height(8.dp))
 
-            // ── Role badge ──
-            RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
+            // ── Update banner ──
+            if (updateInfo != null) {
+                UpdateBanner(
+                    version = updateInfo!!.latestVersion,
+                    downloading = updateDownloading,
+                    onUpdate = viewModel::downloadAndInstall,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
 
             // ── Update banner ──
             if (updateInfo != null) {
@@ -178,9 +205,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 ),
                 border = CardDefaults.outlinedCardBorder(),
             ) {
-                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                Column(Modifier.fillMaxWidth()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -210,7 +239,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             "No numbers whitelisted",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp),
+                            modifier = Modifier.padding(start = 12.dp, vertical = 8.dp),
                         )
                     } else {
                         whitelisted.forEach { entry ->
@@ -318,6 +347,27 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             onAdd = { number, label ->
                 viewModel.addToWhitelist(number, label)
                 showAddWhitelistDialog = false
+            },
+        )
+    }
+
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            title = { Text("About") },
+            text = {
+                Column {
+                    Text("Stranger Blocker", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text("v$appVersion", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    Text("Silently blocks incoming calls from unknown numbers. Only calls from saved contacts and whitelisted numbers ring through.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(12.dp))
+                    Text("github.com/khrlagst/stranger-call-blocker", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) { Text("Close") }
             },
         )
     }
