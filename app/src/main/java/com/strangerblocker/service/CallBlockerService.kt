@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class CallBlockerService : CallScreeningService() {
 
@@ -76,7 +77,9 @@ class CallBlockerService : CallScreeningService() {
     private fun isWhitelisted(number: String): Boolean {
         return try {
             val db = (applicationContext as StrangerBlockerApp).db
-            db.whitelistedNumberDao().isWhitelisted(number)
+            runBlocking(Dispatchers.IO) {
+                db.whitelistedNumberDao().isWhitelisted(number)
+            }
         } catch (_: Exception) {
             false
         }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -117,34 +118,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return mgr.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
     }
 
+    // ── Export ──
+
+    private val _exportIntent = MutableStateFlow<Intent?>(null)
+    val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
+
+    fun exportCsv() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val ctx = getApplication<Application>()
+                val calls = db.blockedCallDao().getAll()
+                val dateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                val csv = buildString {
+                    appendLine("phone_number,blocked_at")
+                    calls.forEach { call ->
+                        appendLine("${call.phoneNumber},${dateFmt.format(Date(call.blockedAtMillis))}")
+                    }
+                }
+                val file = File(ctx.cacheDir, "blocked_calls.csv")
+                file.writeText(csv)
+                val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+                _exportIntent.value = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            } catch (_: Exception) {
+                _exportIntent.value = null
+            }
+        }
+    }
+
+    fun clearExportIntent() {
+        _exportIntent.value = null
+    }
+
     // ── Actions ──
 
     fun clearHistory() {
         viewModelScope.launch { db.blockedCallDao().clearAll() }
-    }
-
-    fun exportCsv(): Intent? {
-        return try {
-            val ctx = getApplication<Application>()
-            val calls = db.blockedCallDao().getAll() // requires non-Flow query
-            val dateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-            val csv = buildString {
-                appendLine("phone_number,blocked_at")
-                calls.forEach { call ->
-                    appendLine("${call.phoneNumber},${dateFmt.format(Date(call.blockedAtMillis))}")
-                }
-            }
-            val file = File(ctx.cacheDir, "blocked_calls.csv")
-            file.writeText(csv)
-            val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/csv"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        } catch (_: Exception) {
-            null
-        }
     }
 
     init {

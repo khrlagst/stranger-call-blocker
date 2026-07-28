@@ -27,12 +27,8 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Setup Gradle (with Build Scan)
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-scan-publish: true
-          build-scan-terms-of-service-url: "https://gradle.com/terms-of-service"
-          build-scan-terms-of-service-agree: "yes"
 
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version=8.11.1
@@ -45,7 +41,7 @@ jobs:
             -dname "CN=StrangerBlocker, OU=Dev, O=Personal, L=Unknown, ST=Unknown, C=XX"
 
       - name: Build debug + release APKs
-        run: ./gradlew assembleDebug assembleRelease --scan
+        run: ./gradlew assembleDebug assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

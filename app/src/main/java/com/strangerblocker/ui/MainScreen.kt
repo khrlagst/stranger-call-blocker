@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,7 +67,15 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val whitelisted by viewModel.whitelisted.collectAsState(initial = emptyList())
     val context = LocalContext.current
 
+    val exportIntent by viewModel.exportIntent.collectAsState()
     var showAddWhitelistDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(exportIntent) {
+        exportIntent?.let {
+            context.startActivity(Intent.createChooser(it, "Export blocked calls"))
+            viewModel.clearExportIntent()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -150,13 +159,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 )
                 Row {
                     if (totalBlocked > 0) {
-                        IconButton(onClick = {
-                            viewModel.exportCsv()?.let { intent ->
-                                context.startActivity(
-                                    Intent.createChooser(intent, "Export blocked calls")
-                                )
-                            }
-                        }) {
+                        IconButton(onClick = { viewModel.exportCsv() }) {
                             Icon(Icons.Default.FileDownload, contentDescription = "Export CSV")
                         }
                         IconButton(onClick = viewModel::clearHistory) {
