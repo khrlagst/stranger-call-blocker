@@ -11,22 +11,32 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/**
- * Telecom CallScreeningService that silently rejects incoming calls
- * from numbers NOT in the device's contacts list.
- *
- * Must be declared in AndroidManifest.xml with
- * `android.permission.BIND_SCREENING_SERVICE`.
- */
 class CallBlockerService : CallScreeningService() {
 
-    /** App-scoped coroutine scope for DB writes. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onScreenCall(details: Call.Details) {
-        val phoneNumber = details.handle?.schemeSpecificPart ?: return
+        val phoneNumber = details.handle?.schemeSpecificPart
+
+        // No caller ID (private/unknown number) → block silently
+        if (phoneNumber == null) {
+            respondToCall(
+                details,
+                CallScreeningService.CallResponse.Builder()
+                    .setDisallowCall(true)
+                    .setRejectCall(true)
+                    .build(),
+            )
+            return
+        }
 
         if (!isBlockingEnabled()) {
+            respondToCall(details, CallScreeningService.CallResponse.Builder().build())
+            return
+        }
+
+        // Whitelist check first (fastest path)
+        if (isWhitelisted(phoneNumber)) {
             respondToCall(details, CallScreeningService.CallResponse.Builder().build())
             return
         }
@@ -34,10 +44,8 @@ class CallBlockerService : CallScreeningService() {
         val isContact = isNumberInContacts(phoneNumber)
 
         if (isContact) {
-            // Let contact calls ring through
             respondToCall(details, CallScreeningService.CallResponse.Builder().build())
         } else {
-            // Silently reject the call
             respondToCall(
                 details,
                 CallScreeningService.CallResponse.Builder()
@@ -48,7 +56,6 @@ class CallBlockerService : CallScreeningService() {
                     .build(),
             )
 
-            // Persist to block history (number + timestamp only — no contact names)
             scope.launch {
                 val db = (applicationContext as StrangerBlockerApp).db
                 db.blockedCallDao().insert(
@@ -61,20 +68,20 @@ class CallBlockerService : CallScreeningService() {
         }
     }
 
-    /** Check SharedPreferences for the blocking toggle state. */
     private fun isBlockingEnabled(): Boolean {
         val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
-        return prefs.getBoolean("blocking_enabled", true) // default ON
+        return prefs.getBoolean("blocking_enabled", true)
     }
 
-    /**
-     * Query ContactsContract to determine if [number] belongs to a
-     * known contact. Returns true if at least one matching contact row
-     * exists.
-     *
-     * If the app lacks READ_CONTACTS permission, defaults to false
-     * (unknown) so the call gets rejected — safe fail-closed.
-     */
+    private fun isWhitelisted(number: String): Boolean {
+        return try {
+            val db = (applicationContext as StrangerBlockerApp).db
+            db.whitelistedNumberDao().isWhitelisted(number)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun isNumberInContacts(number: String): Boolean {
         return try {
             val uri = Uri.withAppendedPath(
@@ -86,7 +93,6 @@ class CallBlockerService : CallScreeningService() {
                 cursor.count > 0
             } ?: false
         } catch (_: SecurityException) {
-            // READ_CONTACTS not granted — can't verify, so treat as unknown
             false
         }
     }

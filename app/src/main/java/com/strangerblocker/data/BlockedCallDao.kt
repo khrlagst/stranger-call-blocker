@@ -23,4 +23,8 @@ interface BlockedCallDao {
     /** Purge entries older than [cutoff] millis (e.g. 30 days). */
     @Query("DELETE FROM blocked_calls WHERE blockedAtMillis < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long)
+
+    /** Snapshot of all entries for export (non-Flow). */
+    @Query("SELECT * FROM blocked_calls ORDER BY blockedAtMillis DESC")
+    suspend fun getAll(): List<BlockedCall>
 }

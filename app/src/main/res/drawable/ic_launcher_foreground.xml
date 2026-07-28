@@ -4,8 +4,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Shield icon -->
-    <path
-        android:fillColor="#1B5E20"
-        android:pathData="M54,24L24,36v16c0,16.97 11.53,32.92 30,36 18.47,-3.08 30,-19.03 30,-36V36L54,24zM54,66.45L54,40.18l17.25,6.17C70.03,57.42 63.28,64.88 54,66.45z" />
+    <!-- Shield icon — scaled down to fit adaptive-icon safe zone (72dp) -->
+    <group
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:fillColor="#1B5E20"
+            android:pathData="M36,6L6,18v16c0,16.97 11.53,32.92 30,36 18.47,-3.08 30,-19.03 30,-36V18L36,6zM36,48.45L36,22.18l17.25,6.17C52.03,39.42 45.28,46.88 36,48.45z" />
+    </group>
 </vector>

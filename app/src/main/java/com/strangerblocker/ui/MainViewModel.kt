@@ -3,18 +3,29 @@ package com.strangerblocker.ui
 import android.app.Application
 import android.app.role.RoleManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
+import com.strangerblocker.data.WhitelistedNumber
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
+data class CallGroup(val header: String, val calls: List<BlockedCall>)
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -23,45 +34,123 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = (application as StrangerBlockerApp).db
 
-    /** Blocked-call history, observed live from Room. */
-    val blockedCalls: Flow<List<BlockedCall>> = db.blockedCallDao().observeAll()
+    // ── Block history ──
 
-    init {
-        // Auto-prune entries older than 30 days on every launch
+    private val blockedCalls: Flow<List<BlockedCall>> = db.blockedCallDao().observeAll()
+
+    val groupedCalls: StateFlow<List<CallGroup>> = blockedCalls.map { calls ->
+        val cal = Calendar.getInstance()
+        val today = cal.get(Calendar.DAY_OF_YEAR)
+        val todayYear = cal.get(Calendar.YEAR)
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterday = cal.get(Calendar.DAY_OF_YEAR)
+
+        calls.groupBy { call ->
+            cal.timeInMillis = call.blockedAtMillis
+            val day = cal.get(Calendar.DAY_OF_YEAR)
+            val year = cal.get(Calendar.YEAR)
+            when {
+                day == today && year == todayYear -> 0
+                day == yesterday && year == todayYear -> 1
+                year == todayYear -> 2
+                else -> 3
+            }
+        }.entries.sortedBy { it.key }.map { (key, group) ->
+            val label = when (key) {
+                0 -> "Today"
+                1 -> "Yesterday"
+                2 -> "This Week"
+                else -> "Earlier"
+            }
+            CallGroup(label, group)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalBlocked: StateFlow<Int> = blockedCalls.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    // ── Whitelist ──
+
+    val whitelisted: Flow<List<WhitelistedNumber>> = db.whitelistedNumberDao().observeAll()
+
+    fun addToWhitelist(number: String, label: String?) {
         viewModelScope.launch {
-            val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
-            db.blockedCallDao().deleteOlderThan(thirtyDaysAgo)
+            db.whitelistedNumberDao().insert(
+                WhitelistedNumber(
+                    phoneNumber = number,
+                    label = label?.takeIf { it.isNotBlank() },
+                    addedAtMillis = System.currentTimeMillis(),
+                )
+            )
         }
     }
 
-    /** Toggle state. */
+    fun removeFromWhitelist(number: String) {
+        viewModelScope.launch {
+            db.whitelistedNumberDao().delete(number)
+        }
+    }
+
+    // ── Toggle ──
+
     val isBlockingEnabled: StateFlow<Boolean> = MutableStateFlow(
         prefs.getBoolean("blocking_enabled", true)
     ).asStateFlow()
-
-    /** Role grant state. */
-    val isRoleHeld: StateFlow<Boolean> = MutableStateFlow(
-        checkRoleHeld()
-    ).asStateFlow()
-
-    private fun checkRoleHeld(): Boolean {
-        val roleManager = getApplication<Application>()
-            .getSystemService(Context.ROLE_SERVICE) as RoleManager
-        return roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
-    }
 
     fun toggleBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("blocking_enabled", enabled).apply()
         (isBlockingEnabled as MutableStateFlow).value = enabled
     }
 
+    // ── Role ──
+
+    val isRoleHeld: StateFlow<Boolean> = MutableStateFlow(
+        checkRoleHeld()
+    ).asStateFlow()
+
     fun refreshRoleStatus() {
         (isRoleHeld as MutableStateFlow).value = checkRoleHeld()
     }
 
+    private fun checkRoleHeld(): Boolean {
+        val mgr = getApplication<Application>().getSystemService(Context.ROLE_SERVICE) as RoleManager
+        return mgr.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+    }
+
+    // ── Actions ──
+
     fun clearHistory() {
+        viewModelScope.launch { db.blockedCallDao().clearAll() }
+    }
+
+    fun exportCsv(): Intent? {
+        return try {
+            val ctx = getApplication<Application>()
+            val calls = db.blockedCallDao().getAll() // requires non-Flow query
+            val dateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            val csv = buildString {
+                appendLine("phone_number,blocked_at")
+                calls.forEach { call ->
+                    appendLine("${call.phoneNumber},${dateFmt.format(Date(call.blockedAtMillis))}")
+                }
+            }
+            val file = File(ctx.cacheDir, "blocked_calls.csv")
+            file.writeText(csv)
+            val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    init {
         viewModelScope.launch {
-            db.blockedCallDao().clearAll()
+            val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+            db.blockedCallDao().deleteOlderThan(thirtyDaysAgo)
         }
     }
 }
