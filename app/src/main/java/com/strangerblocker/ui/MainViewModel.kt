@@ -8,7 +8,6 @@ import android.content.SharedPreferences
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.strangerblocker.BuildConfig
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.UpdateChecker
@@ -167,8 +166,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun checkForUpdates() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val ctx = getApplication<Application>()
+                val currentVer = ctx.packageManager
+                    .getPackageInfo(ctx.packageName, 0)
+                    .versionName ?: "0.0.0"
                 val info = UpdateChecker.check() ?: return@launch
-                if (info.isNewerThan(BuildConfig.VERSION_NAME)) {
+                if (info.isNewerThan(currentVer)) {
                     _updateInfo.value = info
                 }
             } catch (_: Exception) {

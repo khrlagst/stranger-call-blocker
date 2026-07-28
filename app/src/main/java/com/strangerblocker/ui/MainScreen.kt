@@ -402,7 +402,7 @@ private fun UpdateBanner(version: String, downloading: Boolean, onUpdate: () -> 
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         ),
-        onClick = if (downloading) null else onUpdate,
+        onClick = if (downloading) {} else onUpdate,
     ) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
