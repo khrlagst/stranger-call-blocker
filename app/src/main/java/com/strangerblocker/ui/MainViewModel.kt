@@ -8,8 +8,11 @@ import android.content.SharedPreferences
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.strangerblocker.BuildConfig
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
+import com.strangerblocker.data.UpdateChecker
+import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -153,6 +156,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _exportIntent.value = null
     }
 
+    // ── Updates ──
+
+    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
+
+    private val _updateDownloading = MutableStateFlow(false)
+    val updateDownloading: StateFlow<Boolean> = _updateDownloading.asStateFlow()
+
+    fun checkForUpdates() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val info = UpdateChecker.check() ?: return@launch
+                if (info.isNewerThan(BuildConfig.VERSION_NAME)) {
+                    _updateInfo.value = info
+                }
+            } catch (_: Exception) {
+                // silent — network error or rate limit
+            }
+        }
+    }
+
+    fun downloadAndInstall() {
+        val info = _updateInfo.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            _updateDownloading.value = true
+            try {
+                val ctx = getApplication<Application>()
+                val apk = File(ctx.cacheDir, "update.apk")
+                UpdateChecker.download(info.downloadUrl, apk)
+                val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", apk)
+                _updateInfo.value = null // clear banner
+                _updateDownloading.value = false
+                // Launch system package installer
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(intent)
+            } catch (_: Exception) {
+                _updateDownloading.value = false
+            }
+        }
+    }
+
     // ── Actions ──
 
     fun clearHistory() {
@@ -164,5 +212,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
             db.blockedCallDao().deleteOlderThan(thirtyDaysAgo)
         }
+        checkForUpdates()
     }
 }

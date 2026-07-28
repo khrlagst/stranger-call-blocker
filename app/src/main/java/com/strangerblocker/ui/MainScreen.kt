@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhoneForwarded
@@ -28,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,6 +71,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
 
     val exportIntent by viewModel.exportIntent.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
+    val updateDownloading by viewModel.updateDownloading.collectAsState()
     var showAddWhitelistDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(exportIntent) {
@@ -107,7 +112,17 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         ) {
             Spacer(Modifier.height(8.dp))
             RoleBanner(isRoleHeld = isRoleHeld, onCheck = viewModel::refreshRoleStatus)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+
+            // ── Update banner ──
+            if (updateInfo != null) {
+                UpdateBanner(
+                    version = updateInfo!!.latestVersion,
+                    downloading = updateDownloading,
+                    onUpdate = viewModel::downloadAndInstall,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
 
             ToggleCard(isBlockingEnabled, viewModel::toggleBlocking)
             Spacer(Modifier.height(16.dp))
@@ -378,4 +393,43 @@ private fun AddWhitelistDialog(onDismiss: () -> Unit, onAdd: (String, String?) -
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
+}
+
+@Composable
+private fun UpdateBanner(version: String, downloading: Boolean, onUpdate: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+        onClick = if (downloading) null else onUpdate,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.Download, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Update v$version available",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    if (downloading) "Downloading…" else "Tap to download & install",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
+            if (downloading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+        }
+    }
 }
