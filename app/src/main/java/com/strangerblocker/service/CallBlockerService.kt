@@ -5,7 +5,6 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
-import android.telecom.CallResponse
 import android.telecom.CallScreeningService
 import android.telecom.TelecomManager
 import com.strangerblocker.StrangerBlockerApp
@@ -31,7 +30,7 @@ class CallBlockerService : CallScreeningService() {
         val phoneNumber = details.handle?.schemeSpecificPart ?: return
 
         if (!isBlockingEnabled()) {
-            respondToCall(details, CallResponse.Builder().build())
+            respondToCall(details, CallScreeningService.CallResponse.Builder().build())
             return
         }
 
@@ -39,12 +38,12 @@ class CallBlockerService : CallScreeningService() {
 
         if (isContact) {
             // Let contact calls ring through
-            respondToCall(details, CallResponse.Builder().build())
+            respondToCall(details, CallScreeningService.CallResponse.Builder().build())
         } else {
             // Silently reject the call
             respondToCall(
                 details,
-                CallResponse.Builder()
+                CallScreeningService.CallResponse.Builder()
                     .setDisallowCall(true)
                     .setRejectCall(true)
                     .setSkipCallLog(false)
