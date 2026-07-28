@@ -235,12 +235,16 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         }
                     }
                     if (whitelisted.isEmpty()) {
-                        Text(
-                            "No numbers whitelisted",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "No numbers whitelisted",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            )
+                        }
                     } else {
                         whitelisted.forEach { entry ->
                             WhitelistRow(
@@ -293,7 +297,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     // List
                     if (groupedCalls.isEmpty()) {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -312,7 +316,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         }
                     } else {
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
                         ) {
                             groupedCalls.forEach { group ->
                                 item(key = "header_${group.header}") {
@@ -360,9 +364,21 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     Text("Stranger Blocker", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(4.dp))
                     Text("v$appVersion", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(12.dp))
-                    Text("Silently blocks incoming calls from unknown numbers. Only calls from saved contacts and whitelisted numbers ring through.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Text("What's new", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    Text("1.4.0 — Larger header, badge in top bar, about dialog", style = MaterialTheme.typography.bodySmall)
+                    Text("1.3.0 — Minimal redesign, persistent signing key", style = MaterialTheme.typography.bodySmall)
+                    Text("1.2.0 — Whitelist, grouped history, CSV export", style = MaterialTheme.typography.bodySmall)
+                    Text("1.1.0 — OTA updates, private number blocking", style = MaterialTheme.typography.bodySmall)
+                    Text("1.0.0 — Initial release", style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Text("Silently blocks incoming calls from unknown numbers.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(8.dp))
                     Text("github.com/khrlagst/stranger-call-blocker", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = MaterialTheme.colorScheme.primary)
                 }
             },
