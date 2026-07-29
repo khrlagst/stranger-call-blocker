@@ -381,8 +381,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         AddWhitelistDialog(
             number = whitelistInputNumber,
             label = whitelistInputLabel,
-            onNumberChange = viewModel.whitelistInputNumber::setValue,
-            onLabelChange = viewModel.whitelistInputLabel::setValue,
+            onNumberChange = { viewModel.whitelistInputNumber.value = it },
+            onLabelChange = { viewModel.whitelistInputLabel.value = it },
             onAdd = viewModel::confirmAddWhitelist,
             onDismiss = viewModel::closeAddWhitelistDialog,
         )
