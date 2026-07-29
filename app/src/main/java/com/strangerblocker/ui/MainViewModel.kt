@@ -303,9 +303,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun openUpdateDialog() { showUpdateDialog.value = true }
     fun closeUpdateDialog() { showUpdateDialog.value = false }
 
-    fun openUpdateDialog() { showUpdateDialog.value = true }
-    fun closeUpdateDialog() { showUpdateDialog.value = false }
-
     fun openAddWhitelistDialog() { showAddWhitelistDialog.value = true }
     fun closeAddWhitelistDialog() { showAddWhitelistDialog.value = false }
 
