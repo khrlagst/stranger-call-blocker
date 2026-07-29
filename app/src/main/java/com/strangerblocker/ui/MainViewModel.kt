@@ -1,13 +1,18 @@
 package com.strangerblocker.ui
 
 import android.app.Application
+import android.app.PendingIntent
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.strangerblocker.MainActivity
+import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.UpdateChecker
@@ -118,6 +123,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshBlockingState() {
+        _isBlockingEnabled.value = prefs.getBoolean("blocking_enabled", true)
+    }
+
     fun toggleBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("blocking_enabled", enabled).apply()
         _isBlockingEnabled.value = enabled
@@ -133,6 +142,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleNotifications(enabled: Boolean) {
         prefs.edit().putBoolean("notifications_enabled", enabled).apply()
         _notificationsEnabled.value = enabled
+        val app = getApplication<Application>()
+        if (enabled) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val cal = Calendar.getInstance()
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val count = db.blockedCallDao().countSince(cal.timeInMillis)
+                val intent = Intent(app, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                val pi = PendingIntent.getActivity(
+                    app, 0, intent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+                val notification = NotificationCompat.Builder(app, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setContentTitle("$count blocked today")
+                    .setContentText("Stranger Blocker is active")
+                    .setNumber(count)
+                    .setContentIntent(pi)
+                    .setAutoCancel(false)
+                    .setSilent(true)
+                    .build()
+                NotificationManagerCompat.from(app).notify(1001, notification)
+            }
+        } else {
+            NotificationManagerCompat.from(app).cancel(1001)
+        }
     }
 
     // ── Role ──

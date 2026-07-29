@@ -908,5 +908,5 @@ private fun ClearHistoryDialog(
 }
 
 private fun latestChangelog(): String {
-    return "1.7.0 — Status bar notification, Quick Settings tile, notification toggle in Settings"
+    return "1.7.1 — Notification count from DB, QS tile sync, toggle immediate effect, release notes from commits"
 }

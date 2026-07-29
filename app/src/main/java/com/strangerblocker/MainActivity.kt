@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshRoleStatus()
+        viewModel.refreshBlockingState()
     }
 
     private fun isRoleHeld(): Boolean {

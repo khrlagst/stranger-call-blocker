@@ -22,7 +22,7 @@ class BlockerTileService : TileService() {
 
     override fun onClick() {
         val current = prefs.getBoolean("blocking_enabled", true)
-        prefs.edit().putBoolean("blocking_enabled", !current).apply()
+        prefs.edit().putBoolean("blocking_enabled", !current).commit()
         updateTile()
     }
 
