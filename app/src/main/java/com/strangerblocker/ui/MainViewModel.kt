@@ -2,6 +2,7 @@ package com.strangerblocker.ui
 
 import android.app.Application
 import android.app.PendingIntent
+import android.net.Uri
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
