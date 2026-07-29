@@ -485,7 +485,7 @@ private fun BlockedContent(
 ) {
     if (groups.isEmpty()) {
         Box(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -503,7 +503,7 @@ private fun BlockedContent(
             }
         }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
             groups.forEach { group ->
                 stickyHeader(key = "header_${group.header}") {
                     Text(
