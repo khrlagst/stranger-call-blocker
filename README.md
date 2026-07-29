@@ -1,7 +1,6 @@
 <div align="center">
   <br>
-  <pre style="font-size:48px;margin:0;line-height:1">🛡️</pre>
-
+  
   # Stranger Blocker
 
   **Silence unknown callers before the phone rings.**
