@@ -177,8 +177,6 @@ class CallBlockerService : CallScreeningService() {
                 .setContentTitle("$text blocked today")
                 .setContentText("Stranger Blocker is active")
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(false)
-                .setSilent(true)
                 .build()
         } else {
             notification = NotificationCompat.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)

@@ -205,8 +205,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         .setContentTitle("$text blocked today")
                         .setContentText("Stranger Blocker is active")
                         .setContentIntent(pi)
-                        .setAutoCancel(false)
-                        .setSilent(true)
                         .build()
                 } else {
                     notification = NotificationCompat.Builder(app, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
@@ -413,8 +411,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .setContentTitle("$text blocked today")
                     .setContentText("Stranger Blocker is active")
                     .setContentIntent(pi)
-                    .setAutoCancel(false)
-                    .setSilent(true)
                     .build()
             } else {
                 notification = NotificationCompat.Builder(app, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
