@@ -730,6 +730,8 @@ private fun SettingsSheet(
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Emerald,
                                 checkedTrackColor = Emerald.copy(alpha = 0.2f),
+                                uncheckedThumbColor = Gray500,
+                                uncheckedTrackColor = Gray300.copy(alpha = 0.4f),
                             ),
                         )
                     }
@@ -755,11 +757,6 @@ private fun SettingsSheet(
                     "v$appVersion",
                     style = MaterialTheme.typography.bodySmall,
                     color = Gray500,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "Silently blocks incoming calls from unknown numbers.",
-                    style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -814,7 +811,10 @@ private fun SettingsSheet(
                     color = Emerald,
                 )
                 Spacer(Modifier.height(6.dp))
-                ChangelogText()
+                Text(
+                    latestChangelog(),
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "github.com/khrlagst/stranger-call-blocker",
@@ -907,25 +907,6 @@ private fun ClearHistoryDialog(
     )
 }
 
-@Composable
-private fun ChangelogText() {
-    Column {
-        listOf(
-            "1.7.0" to "Status bar notification, Quick Settings tile, notification toggle in Settings",
-            "1.6.1" to "Toggle crash fix, tab pill badges, role refresh on resume",
-            "1.6.0" to "Tabs, dot indicator, update in About, clear confirmation dialog",
-            "1.5.1" to "Header layout fixes, whitelist padding, bottom spacing",
-            "1.5.0" to "UI redesign, emerald theme, about/update dialogs",
-            "1.4.0" to "Larger header, badge in top bar, about dialog",
-            "1.3.0" to "Minimal redesign, persistent signing key",
-            "1.2.0" to "Whitelist, grouped history, CSV export",
-            "1.1.0" to "OTA updates, private number blocking",
-            "1.0.0" to "Initial release",
-        ).forEach { (ver, desc) ->
-            Text(
-                "$ver — $desc",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
+private fun latestChangelog(): String {
+    return "1.7.0 — Status bar notification, Quick Settings tile, notification toggle in Settings"
 }

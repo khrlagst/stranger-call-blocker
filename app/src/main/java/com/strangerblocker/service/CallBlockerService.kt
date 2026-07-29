@@ -124,6 +124,18 @@ class CallBlockerService : CallScreeningService() {
 
         val todayKey = "blocked_today_${todayDate()}"
         val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
+
+        // If this is the first notification today, init counter from DB so
+        // the count reflects the entire day's blocking, not just since the
+        // notification became active.
+        if (!prefs.contains(todayKey)) {
+            val todayStart = todayStartMillis()
+            val dbCount = runBlocking(Dispatchers.IO) {
+                app.db.blockedCallDao().countSince(todayStart)
+            }
+            prefs.edit().putInt(todayKey, dbCount).apply()
+        }
+
         val count = prefs.getInt(todayKey, 0)
         prefs.edit().putInt(todayKey, count + 1).apply()
 
@@ -150,6 +162,15 @@ class CallBlockerService : CallScreeningService() {
 
     private fun todayDate(): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    }
+
+    private fun todayStartMillis(): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 
     companion object {

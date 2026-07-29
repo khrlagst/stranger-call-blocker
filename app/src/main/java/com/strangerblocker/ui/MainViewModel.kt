@@ -112,6 +112,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     val isBlockingEnabled: StateFlow<Boolean> = _isBlockingEnabled.asStateFlow()
 
+    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "blocking_enabled") {
+            _isBlockingEnabled.value = prefs.getBoolean("blocking_enabled", true)
+        }
+    }
+
     fun toggleBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("blocking_enabled", enabled).apply()
         _isBlockingEnabled.value = enabled
@@ -283,6 +289,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
         viewModelScope.launch {
             val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
             db.blockedCallDao().deleteOlderThan(thirtyDaysAgo)

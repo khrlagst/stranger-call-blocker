@@ -27,4 +27,8 @@ interface BlockedCallDao {
     /** Snapshot of all entries for export (non-Flow). */
     @Query("SELECT * FROM blocked_calls ORDER BY blockedAtMillis DESC")
     suspend fun getAll(): List<BlockedCall>
+
+    /** Count of calls blocked since [since] millis (used for daily notification). */
+    @Query("SELECT COUNT(*) FROM blocked_calls WHERE blockedAtMillis >= :since")
+    suspend fun countSince(since: Long): Int
 }
