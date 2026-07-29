@@ -332,15 +332,39 @@ private fun TabItem(
         modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            "$label $count",
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                fontSize = 12.sp,
-            ),
-            color = if (selected) EmeraldDark else Gray500,
-        )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(10.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 12.sp,
+                ),
+                color = if (selected) EmeraldDark else Gray500,
+            )
+            Spacer(Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .background(
+                        color = if (selected) Emerald else Gray300.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(10.dp),
+                    )
+                    .padding(horizontal = 7.dp, vertical = 1.dp),
+            ) {
+                Text(
+                    "$count",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = if (selected) Color.White else Gray500,
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()

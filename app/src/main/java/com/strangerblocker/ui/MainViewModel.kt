@@ -107,23 +107,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Toggle ──
 
-    val isBlockingEnabled: StateFlow<Boolean> = MutableStateFlow(
+    private val _isBlockingEnabled = MutableStateFlow(
         prefs.getBoolean("blocking_enabled", true)
-    ).asStateFlow()
+    )
+    val isBlockingEnabled: StateFlow<Boolean> = _isBlockingEnabled.asStateFlow()
 
     fun toggleBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("blocking_enabled", enabled).apply()
-        (isBlockingEnabled as MutableStateFlow).value = enabled
+        _isBlockingEnabled.value = enabled
     }
 
     // ── Role ──
 
-    val isRoleHeld: StateFlow<Boolean> = MutableStateFlow(
-        checkRoleHeld()
-    ).asStateFlow()
+    private val _isRoleHeld = MutableStateFlow(checkRoleHeld())
+    val isRoleHeld: StateFlow<Boolean> = _isRoleHeld.asStateFlow()
 
     fun refreshRoleStatus() {
-        (isRoleHeld as MutableStateFlow).value = checkRoleHeld()
+        _isRoleHeld.value = checkRoleHeld()
     }
 
     private fun checkRoleHeld(): Boolean {
