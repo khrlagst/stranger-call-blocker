@@ -144,8 +144,8 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
-| **1.7.2** | Proper version bump, MIT license, privacy section, README |
-| **1.7.1** | Notification count init from DB, QS tile sync, toggle immediate effect, auto-generated release notes |
+| **1.8.0** | Sticky section headers, direct CSV save to local storage via document picker |
+| **1.7.x** | Notification, Quick Settings tile, license, privacy section, README |
 | **1.7.0** | Status bar notification, Quick Settings tile, notification toggle in Settings |
 | **1.6.x** | Tabs, dot indicator, Settings screen, clear confirmation, toggle crash fix |
 | **1.5.x** | Emerald theme redesign, symmetrical header, badge, cards |
