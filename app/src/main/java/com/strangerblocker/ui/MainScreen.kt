@@ -508,14 +508,18 @@ private fun BlockedContent(
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             groups.forEach { group ->
                 stickyHeader(key = "header_${group.header}") {
-                    Text(
-                        group.header,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Emerald,
+                    Box(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surface)
                             .padding(start = 12.dp, top = 8.dp, bottom = 2.dp),
-                    )
+                    ) {
+                        Text(
+                            group.header,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Emerald,
+                        )
+                    }
                 }
                 items(group.calls, key = { it.id }) { call ->
                     BlockedCallRow(
