@@ -154,6 +154,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 onIconStyleChange = viewModel::setNotificationIconStyle,
                 themeMode = themeMode,
                 onThemeChange = viewModel::setThemeMode,
+                updateAvailable = updateAvailable,
                 onAbout = { viewModel.navigateTo(Screen.ABOUT) },
                 onBack = viewModel::goHome,
             )
@@ -340,7 +341,10 @@ private fun HomeScreen(
                         onClearHistory = onClearHistory,
                     )
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        HorizontalPager(state = pagerState) { page ->
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                        ) { page ->
                             when (page) {
                                 0 -> WhitelistContent(
                                     entries = whitelisted,
@@ -370,6 +374,7 @@ private fun SettingsScreen(
     onIconStyleChange: (String) -> Unit,
     themeMode: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
+    updateAvailable: Boolean,
     onAbout: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -550,8 +555,19 @@ private fun SettingsScreen(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Default.Shield, contentDescription = null,
-                        modifier = Modifier.size(20.dp), tint = Emerald)
+                    Box {
+                        Icon(Icons.Default.Shield, contentDescription = null,
+                            modifier = Modifier.size(20.dp), tint = Emerald)
+                        if (updateAvailable) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Emerald)
+                                    .align(Alignment.TopEnd)
+                            )
+                        }
+                    }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Stranger Blocker",
@@ -721,13 +737,16 @@ private fun TabItem(
     label: String, count: Int, selected: Boolean,
     onClick: () -> Unit, modifier: Modifier = Modifier,
 ) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = if (selected) Emerald else Color.Transparent,
+    Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
+            .background(
+                color = if (selected) Emerald else Color.Transparent,
+                shape = RoundedCornerShape(20.dp),
+            )
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -739,10 +758,18 @@ private fun TabItem(
                     fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
                 color = if (selected) Color.White else Gray500)
             Spacer(Modifier.width(5.dp))
-            Text("$count",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                color = if (selected) Color.White.copy(alpha = 0.8f) else Gray500)
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Color.White.copy(alpha = 0.25f) else Gray300.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("$count",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                    color = if (selected) Color.White else Gray500)
+            }
         }
     }
 }
@@ -997,9 +1024,9 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 
 private fun latestChangelog(): List<String> {
     return listOf(
-        "Theme support with Light, Dark, System modes (Settings)",
-        "Redesigned tab bar with pill buttons and swipe gesture",
-        "Dark mode contrast: elevated card surfaces (#1E1E1E)",
-        "App drawer icon centered and resized",
+        "Icon position adjusted (translateY 33)",
+        "Tab ripple matches pill shape; count uses circle badge",
+        "Swipe gesture works on all tabs (fillMaxSize on pager)",
+        "Update dot appears on About row in Settings when update exists",
     )
 }
