@@ -11,6 +11,7 @@ import android.telecom.CallScreeningService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.strangerblocker.MainActivity
+import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import kotlinx.coroutines.CoroutineScope

@@ -6,6 +6,7 @@ import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
+import com.strangerblocker.R
 
 @RequiresApi(Build.VERSION_CODES.N)
 class BlockerTileService : TileService() {
