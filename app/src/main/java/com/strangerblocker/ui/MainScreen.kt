@@ -926,5 +926,5 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): String {
-    return "1.8.7 — Icon resize (launcher, notification), circle icon in ViewModel, auto-start notification"
+    return "1.8.8 — Icon centering, circle with count replaces status bar icon via platform API"
 }

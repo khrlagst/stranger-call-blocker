@@ -8,12 +8,15 @@ import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallScreeningService
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
+import android.app.Notification
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.graphics.drawable.Icon
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.strangerblocker.MainActivity
 import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
@@ -152,36 +155,42 @@ class CallBlockerService : CallScreeningService() {
         )
 
         val iconStyle = prefs.getString("notification_icon_style", "shield") ?: "shield"
+        val text = (count + 1).toString()
 
-        val builder = NotificationCompat.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("${count + 1} blocked today")
-            .setContentText("Stranger Blocker is active")
-            .setNumber(count + 1)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(false)
-            .setSilent(true)
-
+        val notification: Notification
         if (iconStyle == "circle_count") {
-            val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
+            val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
-            val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = android.graphics.Color.parseColor("#10B981")
                 style = Paint.Style.FILL
-            }
-            canvas.drawCircle(48f, 48f, 48f, circlePaint)
-            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            }.let { canvas.drawCircle(24f, 24f, 24f, it) }
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = android.graphics.Color.WHITE
                 textAlign = Paint.Align.CENTER
-                textSize = 56f
+                textSize = 26f
                 typeface = Typeface.DEFAULT_BOLD
-            }
-            val text = (count + 1).toString()
-            canvas.drawText(text, 48f, 48f + textPaint.textSize / 3f, textPaint)
-            builder.setLargeIcon(bitmap)
+            }.let { canvas.drawText(text, 24f, 24f + 26f / 3f, it) }
+            val icon = Icon.createWithBitmap(bitmap)
+            notification = Notification.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(icon)
+                .setContentTitle("$text blocked today")
+                .setContentText("Stranger Blocker is active")
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(false)
+                .setSilent(true)
+                .build()
+        } else {
+            notification = NotificationCompat.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("$text blocked today")
+                .setContentText("Stranger Blocker is active")
+                .setNumber(count + 1)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(false)
+                .setSilent(true)
+                .build()
         }
-
-        val notification = builder.build()
 
         NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
     }

@@ -143,6 +143,8 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.8.8** | Icon centering & resizing, circle with count replaces status bar icon, README fix |
+| **1.8.7** | Icon resize, circle icon in ViewModel, auto-start notification on app open |
 | **1.8.6** | About screen centered layout, Settings radio icons, resized launcher and tile |
 | **1.8.5** | Full-screen Settings, dedicated About page, screen-based navigation |
 | **1.8.4** | Official shield icon from SVG, emerald background across all icons |
