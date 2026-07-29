@@ -969,5 +969,5 @@ private fun ClearHistoryDialog(
 }
 
 private fun latestChangelog(): String {
-    return "1.8.3 — Section count badges, circle-with-count notification icon, new app icon"
+    return "1.8.4 — Official shield icon, emerald background, cleaned up resources"
 }

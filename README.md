@@ -143,6 +143,7 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.8.4** | Official shield icon from SVG, emerald background across all icons |
 | **1.8.3** | Section count badges, circle-with-count notification icon, new app icon |
 | **1.8.2** | Compile fixes — weight scope, stickyHeader experimental API |
 | **1.8.0** | Sticky section headers, direct CSV save to local storage via document picker |

@@ -4,16 +4,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Outer shield -->
-    <path
-        android:fillColor="#10B981"
-        android:pathData="M54,8L12,22v20c0,21.2 14.4,41.2 42,48 27.6,-6.8 42,-26.8 42,-48V22L54,8z" />
-    <!-- Inner highlight layer -->
-    <path
-        android:fillColor="#34D399"
-        android:pathData="M54,16L20,27.5v15.5c0,17.6 12,34.2 34,40 22,-5.8 34,-22.4 34,-40V27.5L54,16z" />
-    <!-- Checkmark -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M44,58l-8,-8l-5,5l13,13l26,-26l-5,-5z" />
+    <group
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:fillColor="#10B981"
+            android:pathData="M69.5,4L36,16.3L2.5,4v44.7c0,22.5 15.2,43.6 33.5,50.8 18.3,-7.2 33.5,-28.3 33.5,-50.8V4z" />
+        <path
+            android:fillColor="#34D399"
+            android:pathData="M69.5,15.8L36,26.3L2.5,15.8v32.9c0,18.9 12.9,36.7 33.5,42.8 20.6,-6.1 33.5,-23.9 33.5,-42.8V15.8z" />
+        <path
+            android:fillColor="#047857"
+            android:pathData="M20.5,35.2v28.5c0,6.5 15.9,19.6 15.5,19.6 15.5,-6.1 15.5,-13.1 15.5,-19.6V35.2L36,31.2l-15.5,4V35.2z" />
+    </group>
 </vector>
