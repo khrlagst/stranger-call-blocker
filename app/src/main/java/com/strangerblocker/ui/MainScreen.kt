@@ -911,6 +911,7 @@ private fun ClearHistoryDialog(
 private fun ChangelogText() {
     Column {
         listOf(
+            "1.7.0" to "Status bar notification, Quick Settings tile, notification toggle in Settings",
             "1.6.1" to "Toggle crash fix, tab pill badges, role refresh on resume",
             "1.6.0" to "Tabs, dot indicator, update in About, clear confirmation dialog",
             "1.5.1" to "Header layout fixes, whitelist padding, bottom spacing",
