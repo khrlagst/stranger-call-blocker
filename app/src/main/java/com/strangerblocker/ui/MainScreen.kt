@@ -30,7 +30,9 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
@@ -92,7 +94,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val updateInfo by viewModel.updateInfo.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val updateDownloading by viewModel.updateDownloading.collectAsState()
-    val showAboutDialog by viewModel.showAboutDialog.collectAsState()
+    val showSettings by viewModel.showSettings.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
     val showAddWhitelistDialog by viewModel.showAddWhitelistDialog.collectAsState()
@@ -134,9 +136,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
                     Spacer(Modifier.width(4.dp))
                     Box {
-                        IconButton(onClick = viewModel::openAboutDialog) {
+                        IconButton(onClick = viewModel::openSettings) {
                             Icon(
-                                Icons.Default.Info, contentDescription = "About",
+                                Icons.Default.Settings, contentDescription = "Settings",
                                 tint = Gray300,
                             )
                         }
@@ -245,14 +247,14 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 
     // ── Dialogs ──
 
-    if (showAboutDialog) {
-        AboutDialog(
+    if (showSettings) {
+        SettingsSheet(
             appVersion = appVersion,
             updateInfo = updateInfo,
             updateDownloading = updateDownloading,
-            onDismiss = viewModel::closeAboutDialog,
+            onDismiss = viewModel::closeSettings,
             onUpdateClick = {
-                viewModel.closeAboutDialog()
+                viewModel.closeSettings()
                 viewModel.openUpdateDialog()
             },
         )
@@ -667,7 +669,7 @@ private fun AddWhitelistDialog(
 }
 
 @Composable
-private fun AboutDialog(
+private fun SettingsSheet(
     appVersion: String,
     updateInfo: UpdateInfo?,
     updateDownloading: Boolean,
@@ -676,12 +678,82 @@ private fun AboutDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("About") },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Settings", modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close",
+                        tint = Gray300)
+                }
+            }
+        },
         text = {
-            Column {
-                Text("Stranger Blocker", style = MaterialTheme.typography.titleMedium)
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                // ── Notifications section (placeholder for v1.7) ──
+                Text(
+                    "Notifications",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = EmeraldDark,
+                )
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Emerald50,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Block alerts",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                ),
+                                color = EmeraldDark,
+                            )
+                            Text(
+                                "Show blocked call count in status bar",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Gray500,
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "Coming in v1.7",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Gray500.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(start = 12.dp, top = 4.dp),
+                )
+
+                Spacer(Modifier.height(20.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+
+                // ── About section ──
+                Text(
+                    "About",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = EmeraldDark,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Stranger Blocker",
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 Spacer(Modifier.height(2.dp))
-                Text("v$appVersion", style = MaterialTheme.typography.bodySmall, color = Gray500)
+                Text(
+                    "v$appVersion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Gray500,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Silently blocks incoming calls from unknown numbers.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(12.dp))
 
                 // Update available row
@@ -727,25 +799,16 @@ private fun AboutDialog(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(8.dp))
                 }
 
                 Text(
                     "What's new",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = EmeraldDark,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Emerald,
                 )
                 Spacer(Modifier.height(6.dp))
                 ChangelogText()
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Silently blocks incoming calls from unknown numbers.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "github.com/khrlagst/stranger-call-blocker",
                     style = MaterialTheme.typography.bodySmall.copy(
@@ -755,9 +818,7 @@ private fun AboutDialog(
                 )
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
-        },
+        confirmButton = {},
     )
 }
 

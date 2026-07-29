@@ -218,17 +218,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Dialogs ──
+    // ── Dialogs / Screens ──
 
-    val showAboutDialog = MutableStateFlow(false)
+    val showSettings = MutableStateFlow(false)
     val showUpdateDialog = MutableStateFlow(false)
     val showAddWhitelistDialog = MutableStateFlow(false)
 
-    fun openAboutDialog() {
+    fun openSettings() {
         checkForUpdates()
-        showAboutDialog.value = true
+        showSettings.value = true
     }
-    fun closeAboutDialog() { showAboutDialog.value = false }
+    fun closeSettings() { showSettings.value = false }
 
     fun openUpdateDialog() { showUpdateDialog.value = true }
     fun closeUpdateDialog() { showUpdateDialog.value = false }
