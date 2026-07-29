@@ -261,6 +261,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             updateDownloading = updateDownloading,
             notificationsEnabled = notificationsEnabled,
             onNotificationsToggle = viewModel::toggleNotifications,
+            notificationIconStyle = viewModel.notificationIconStyle.collectAsState().value,
+            onIconStyleChange = viewModel::setNotificationIconStyle,
             onDismiss = viewModel::closeSettings,
             onUpdateClick = {
                 viewModel.closeSettings()
@@ -515,7 +517,7 @@ private fun BlockedContent(
                             .padding(start = 12.dp, top = 8.dp, bottom = 2.dp),
                     ) {
                         Text(
-                            group.header,
+                            "${group.header} (${group.calls.size})",
                             style = MaterialTheme.typography.labelMedium,
                             color = Emerald,
                         )
@@ -689,6 +691,8 @@ private fun SettingsSheet(
     updateDownloading: Boolean,
     notificationsEnabled: Boolean,
     onNotificationsToggle: (Boolean) -> Unit,
+    notificationIconStyle: String,
+    onIconStyleChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onUpdateClick: () -> Unit,
 ) {
@@ -745,6 +749,52 @@ private fun SettingsSheet(
                                 uncheckedTrackColor = Gray300.copy(alpha = 0.4f),
                             ),
                         )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Emerald50,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Notification icon",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                ),
+                                color = EmeraldDark,
+                            )
+                            Text(
+                                if (notificationIconStyle == "shield") "Shield" else "Circle with count",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Gray500,
+                            )
+                        }
+                        Row {
+                            listOf("shield" to "Shield", "circle_count" to "Circle").forEach { (value, label) ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (notificationIconStyle == value) Emerald else Color.Transparent,
+                                    modifier = Modifier
+                                        .clickable { onIconStyleChange(value) }
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                ) {
+                                    Text(
+                                        label,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (notificationIconStyle == value) Color.White else Gray500,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -919,5 +969,5 @@ private fun ClearHistoryDialog(
 }
 
 private fun latestChangelog(): String {
-    return "1.8.2 — Compile fixes (weight scope, stickyHeader experimental API)"
+    return "1.8.3 — Section count badges, circle-with-count notification icon, new app icon"
 }

@@ -143,6 +143,8 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.8.3** | Section count badges, circle-with-count notification icon, new app icon |
+| **1.8.2** | Compile fixes — weight scope, stickyHeader experimental API |
 | **1.8.0** | Sticky section headers, direct CSV save to local storage via document picker |
 | **1.7.x** | Notification, Quick Settings tile, license, privacy section, README |
 | **1.7.0** | Status bar notification, Quick Settings tile, notification toggle in Settings |

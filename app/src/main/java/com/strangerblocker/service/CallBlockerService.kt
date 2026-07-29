@@ -10,6 +10,10 @@ import android.telecom.Call
 import android.telecom.CallScreeningService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
 import com.strangerblocker.MainActivity
 import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
@@ -147,7 +151,9 @@ class CallBlockerService : CallScreeningService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        val notification = NotificationCompat.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
+        val iconStyle = prefs.getString("notification_icon_style", "shield") ?: "shield"
+
+        val builder = NotificationCompat.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("${count + 1} blocked today")
             .setContentText("Stranger Blocker is active")
@@ -155,7 +161,27 @@ class CallBlockerService : CallScreeningService() {
             .setContentIntent(pendingIntent)
             .setAutoCancel(false)
             .setSilent(true)
-            .build()
+
+        if (iconStyle == "circle_count") {
+            val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#10B981")
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(48f, 48f, 48f, circlePaint)
+            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                textAlign = Paint.Align.CENTER
+                textSize = 56f
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            val text = (count + 1).toString()
+            canvas.drawText(text, 48f, 48f + textPaint.textSize / 3f, textPaint)
+            builder.setLargeIcon(bitmap)
+        }
+
+        val notification = builder.build()
 
         NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
     }

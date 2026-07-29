@@ -140,6 +140,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
 
+    // ── Notification icon style ──
+
+    private val _notificationIconStyle = MutableStateFlow(
+        prefs.getString("notification_icon_style", "shield") ?: "shield"
+    )
+    val notificationIconStyle: StateFlow<String> = _notificationIconStyle.asStateFlow()
+
+    fun setNotificationIconStyle(style: String) {
+        prefs.edit().putString("notification_icon_style", style).apply()
+        _notificationIconStyle.value = style
+    }
+
     fun toggleNotifications(enabled: Boolean) {
         prefs.edit().putBoolean("notifications_enabled", enabled).apply()
         _notificationsEnabled.value = enabled
