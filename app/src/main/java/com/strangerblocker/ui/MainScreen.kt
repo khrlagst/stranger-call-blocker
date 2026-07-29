@@ -48,6 +48,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -387,70 +388,91 @@ private fun SettingsScreen(
                 color = EmeraldDark,
             )
             Spacer(Modifier.height(8.dp))
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = Emerald50,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Block alerts",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = EmeraldDark)
-                        Text("Show blocked call count in status bar",
-                            style = MaterialTheme.typography.labelSmall, color = Gray500)
-                    }
-                    Switch(
-                        checked = notificationsEnabled,
-                        onCheckedChange = onNotificationsToggle,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Emerald,
-                            checkedTrackColor = Emerald.copy(alpha = 0.2f),
-                            uncheckedThumbColor = Gray500,
-                            uncheckedTrackColor = Gray300.copy(alpha = 0.4f),
-                        ),
-                    )
+                Column(Modifier.weight(1f)) {
+                    Text("Block alerts",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = EmeraldDark)
+                    Text("Show blocked call count in status bar",
+                        style = MaterialTheme.typography.labelSmall, color = Gray500)
+                }
+                Switch(
+                    checked = notificationsEnabled,
+                    onCheckedChange = onNotificationsToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Emerald,
+                        checkedTrackColor = Emerald.copy(alpha = 0.2f),
+                        uncheckedThumbColor = Gray500,
+                        uncheckedTrackColor = Gray300.copy(alpha = 0.4f),
+                    ),
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            Spacer(Modifier.height(4.dp))
+            Text("Notification icon",
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = EmeraldDark)
+            Text("Choose how the icon appears in the status bar",
+                style = MaterialTheme.typography.labelSmall, color = Gray500)
+            Spacer(Modifier.height(8.dp))
+
+            // Shield option
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable { onIconStyleChange("shield") }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(
+                    selected = notificationIconStyle == "shield",
+                    onClick = { onIconStyleChange("shield") },
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Default.Shield, contentDescription = null,
+                    modifier = Modifier.size(20.dp), tint = Emerald)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Shield",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = EmeraldDark)
+                    Text("Status bar shows the SB shield icon",
+                        style = MaterialTheme.typography.labelSmall, color = Gray500)
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = Emerald50,
-                modifier = Modifier.fillMaxWidth(),
+
+            // Circle with count option
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable { onIconStyleChange("circle_count") }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                RadioButton(
+                    selected = notificationIconStyle == "circle_count",
+                    onClick = { onIconStyleChange("circle_count") },
+                )
+                Spacer(Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Emerald, CircleShape),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Notification icon",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = EmeraldDark)
-                        Text(
-                            if (notificationIconStyle == "shield") "Shield" else "Circle with count",
-                            style = MaterialTheme.typography.labelSmall, color = Gray500)
-                    }
-                    Row {
-                        listOf("shield" to "Shield", "circle_count" to "Circle").forEach { (value, label) ->
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (notificationIconStyle == value) Emerald else Color.Transparent,
-                                modifier = Modifier
-                                    .clickable { onIconStyleChange(value) }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                            ) {
-                                Text(label,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        color = if (notificationIconStyle == value) Color.White else Gray500,
-                                    ),
-                                )
-                            }
-                        }
-                    }
+                    Text("N",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold, color = Color.White, fontSize = 9.sp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Circle with count",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = EmeraldDark)
+                    Text("Status bar shows a circle with today's blocked count",
+                        style = MaterialTheme.typography.labelSmall, color = Gray500)
                 }
             }
 
@@ -530,29 +552,40 @@ private fun AboutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Icon(Icons.Default.Shield, contentDescription = null,
-                modifier = Modifier.size(48.dp), tint = Emerald)
-            Spacer(Modifier.height(12.dp))
-            Text("Stranger Blocker",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = EmeraldDark)
-            Text("v$appVersion",
-                style = MaterialTheme.typography.bodyMedium, color = Gray500)
-            Spacer(Modifier.height(4.dp))
+            // ── Centered header ──
+            Box(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Shield, contentDescription = null,
+                    modifier = Modifier.size(48.dp), tint = Emerald)
+            }
+            Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                contentAlignment = Alignment.Center) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Stranger Blocker",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = EmeraldDark)
+                    Spacer(Modifier.width(8.dp))
+                    Text("v$appVersion",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = Gray500)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
             Text("Silently blocks incoming calls from unknown numbers.",
-                style = MaterialTheme.typography.bodySmall, color = Gray500)
+                style = MaterialTheme.typography.bodySmall, color = Gray500,
+                modifier = Modifier.padding(horizontal = 40.dp).align(Alignment.CenterHorizontally))
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Update available row
+            // ── Update available row ──
             if (updateInfo != null) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Emerald50,
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = onUpdateClick),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+                        .clickable(onClick = onUpdateClick),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -576,17 +609,26 @@ private fun AboutScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
+            // ── What's new ──
             Text("What's new",
-                style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
+                style = MaterialTheme.typography.labelLarge, color = EmeraldDark,
+                modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
             Text(latestChangelog(),
-                style = MaterialTheme.typography.bodySmall)
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
+
+            // ── Spacer to push footer down ──
+            Spacer(Modifier.weight(1f))
+
+            // ── Footer ──
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(16.dp))
             Text("github.com/khrlagst/stranger-call-blocker",
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = EmeraldDark)
+                color = EmeraldDark,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp))
         }
     }
 }
@@ -884,5 +926,5 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): String {
-    return "1.8.5 — Full-screen Settings, dedicated About page, screen navigation"
+    return "1.8.6 — About screen centered layout, Settings radio icons, resized launcher and tile icons"
 }

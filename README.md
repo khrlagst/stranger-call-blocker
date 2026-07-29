@@ -143,6 +143,7 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.8.6** | About screen centered layout, Settings radio icons, resized launcher and tile |
 | **1.8.5** | Full-screen Settings, dedicated About page, screen-based navigation |
 | **1.8.4** | Official shield icon from SVG, emerald background across all icons |
 | **1.8.3** | Section count badges, circle-with-count notification icon, new app icon |
