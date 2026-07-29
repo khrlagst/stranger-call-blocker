@@ -30,6 +30,11 @@ import java.util.Locale
 
 data class CallGroup(val header: String, val calls: List<BlockedCall>)
 
+enum class Tab(val label: String) {
+    WHITELIST("Whitelist"),
+    BLOCKED("Blocked"),
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs: SharedPreferences =
@@ -71,6 +76,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val totalBlocked: StateFlow<Int> = blockedCalls.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    // ── Tab selection ──
+
+    val selectedTab = MutableStateFlow(Tab.WHITELIST)
+
+    fun selectTab(tab: Tab) { selectedTab.value = tab }
 
     // ── Whitelist ──
 
@@ -244,10 +255,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         showAddWhitelistDialog.value = false
     }
 
-    // ── Actions ──
+    // ── Clear history confirmation ──
 
-    fun clearHistory() {
+    val showClearHistoryDialog = MutableStateFlow(false)
+
+    fun openClearHistoryDialog() { showClearHistoryDialog.value = true }
+    fun closeClearHistoryDialog() { showClearHistoryDialog.value = false }
+
+    fun confirmClearHistory() {
         viewModelScope.launch { db.blockedCallDao().clearAll() }
+        showClearHistoryDialog.value = false
     }
 
     init {
