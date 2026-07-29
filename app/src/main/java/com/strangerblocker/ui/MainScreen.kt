@@ -832,7 +832,7 @@ private fun WhitelistContent(
             }
         }
     } else {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             entries.forEach { entry ->
                 WhitelistRow(number = entry.phoneNumber, label = entry.label,
                     onRemove = { onRemove(entry) })
@@ -1024,9 +1024,8 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 
 private fun latestChangelog(): List<String> {
     return listOf(
-        "Icon position adjusted (translateY 33)",
-        "Tab ripple matches pill shape; count uses circle badge",
-        "Swipe gesture works on all tabs (fillMaxSize on pager)",
-        "Update dot appears on About row in Settings when update exists",
+        "Icon position fine-tuned (translateY 32)",
+        "Whitelist content top-aligned (fillMaxSize on scrollable Column)",
+        "Notification counter: fixed double-count when initialized from DB",
     )
 }

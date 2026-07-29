@@ -132,19 +132,21 @@ class CallBlockerService : CallScreeningService() {
         val todayKey = "blocked_today_${todayDate()}"
         val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
 
-        // If this is the first notification today, init counter from DB so
-        // the count reflects the entire day's blocking, not just since the
-        // notification became active.
+        val count: Int
         if (!prefs.contains(todayKey)) {
+            // First notification today: init from DB. The call was already
+            // inserted, so dbCount already includes it — no extra increment.
             val todayStart = todayStartMillis()
             val dbCount = runBlocking(Dispatchers.IO) {
                 app.db.blockedCallDao().countSince(todayStart)
             }
             prefs.edit().putInt(todayKey, dbCount).apply()
+            count = dbCount
+        } else {
+            // Subsequent calls: increment the running counter.
+            count = prefs.getInt(todayKey, 0) + 1
+            prefs.edit().putInt(todayKey, count).apply()
         }
-
-        val count = prefs.getInt(todayKey, 0)
-        prefs.edit().putInt(todayKey, count + 1).apply()
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -155,7 +157,7 @@ class CallBlockerService : CallScreeningService() {
         )
 
         val iconStyle = prefs.getString("notification_icon_style", "shield") ?: "shield"
-        val text = (count + 1).toString()
+        val text = count.toString()
 
         val notification: Notification
         if (iconStyle == "circle_count") {

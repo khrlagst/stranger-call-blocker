@@ -143,6 +143,7 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.9.2** | Icon Y fine-tune, whitelist top-aligned, notification counter fixed |
 | **1.9.1** | Icon Y-center fix, tab ripple clip, swipe fillMaxSize, circle count badge, update dot in Settings |
 | **1.9.0** | Theme support (Light/Dark/System), pill tabs with swipe, dark mode contrast, icon centering |
 | **1.8.9** | Smooth icon switching, bullet changelog, icon resize, whitelist dividers, dialog revamp |
