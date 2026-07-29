@@ -926,5 +926,5 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): String {
-    return "1.8.6 — About screen centered layout, Settings radio icons, resized launcher and tile icons"
+    return "1.8.7 — Icon resize (launcher, notification), circle icon in ViewModel, auto-start notification"
 }
