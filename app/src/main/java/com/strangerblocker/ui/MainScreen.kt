@@ -235,7 +235,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     )
 
                     // Scrollable content per tab
-                    when (selectedTab) {
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        when (selectedTab) {
                         Tab.WHITELIST -> WhitelistContent(
                             entries = whitelisted,
                             onRemove = { viewModel.removeFromWhitelist(it.phoneNumber) },
@@ -244,6 +245,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             groups = groupedCalls,
                             onWhitelist = { viewModel.addToWhitelist(it.phoneNumber, null) },
                         )
+                    }
                     }
                 }
             }
@@ -485,7 +487,7 @@ private fun BlockedContent(
 ) {
     if (groups.isEmpty()) {
         Box(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -503,7 +505,7 @@ private fun BlockedContent(
             }
         }
     } else {
-        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
             groups.forEach { group ->
                 stickyHeader(key = "header_${group.header}") {
                     Text(
@@ -913,5 +915,5 @@ private fun ClearHistoryDialog(
 }
 
 private fun latestChangelog(): String {
-    return "1.8.0 — Sticky section headers, direct CSV save to local storage (via document picker)"
+    return "1.8.2 — Compile fixes (weight scope, stickyHeader experimental API)"
 }
