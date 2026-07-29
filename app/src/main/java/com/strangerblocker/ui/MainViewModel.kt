@@ -41,6 +41,12 @@ enum class Tab(val label: String) {
     BLOCKED("Blocked"),
 }
 
+enum class Screen {
+    HOME,
+    SETTINGS,
+    ABOUT,
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs: SharedPreferences =
@@ -276,17 +282,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Dialogs / Screens ──
+    // ── Navigation ──
 
-    val showSettings = MutableStateFlow(false)
+    val currentScreen = MutableStateFlow(Screen.HOME)
+
+    fun navigateTo(screen: Screen) {
+        if (screen == Screen.SETTINGS || screen == Screen.ABOUT) {
+            checkForUpdates()
+        }
+        currentScreen.value = screen
+    }
+
+    fun goHome() { currentScreen.value = Screen.HOME }
+
+    // ── Dialogs ──
+
     val showUpdateDialog = MutableStateFlow(false)
     val showAddWhitelistDialog = MutableStateFlow(false)
 
-    fun openSettings() {
-        checkForUpdates()
-        showSettings.value = true
-    }
-    fun closeSettings() { showSettings.value = false }
+    fun openUpdateDialog() { showUpdateDialog.value = true }
+    fun closeUpdateDialog() { showUpdateDialog.value = false }
 
     fun openUpdateDialog() { showUpdateDialog.value = true }
     fun closeUpdateDialog() { showUpdateDialog.value = false }
