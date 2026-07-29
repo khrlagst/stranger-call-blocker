@@ -12,3 +12,5 @@ local.properties
 ci.keystore
 .omo/
 *.html
+*.svg
+AGENTS.md
