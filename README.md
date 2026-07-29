@@ -126,6 +126,20 @@ Requirements:
 
 ---
 
+## Privacy
+
+Stranger Blocker is designed to be privacy-first:
+
+- **No data leaves your device.** Blocked numbers and timestamps are stored locally in an on-device SQLite database. Nothing is sent to any server.
+- **No analytics, no tracking, no ads.** The app contains zero third-party analytics SDKs, crash reporters, or advertising libraries.
+- **Contacts are read only for screening.** The app queries `ContactsContract.PhoneLookup` at call time to determine if the caller is known. Contact data is never stored, logged, or transmitted.
+- **Internet access is used only for OTA updates.** A single request checks `api.github.com/repos/khrlagst/stranger-call-blocker/releases/latest` to compare versions. No telemetry, no pings, no usage stats.
+- **No account required.** There is no sign-in, no registration, no cloud sync.
+
+The APK is built from source via GitHub Actions. You can verify every release by building from source yourself — no binary transparency needed because the source is the trust anchor.
+
+---
+
 ## Version history
 
 | Version | Highlights |
