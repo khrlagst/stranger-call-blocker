@@ -63,6 +63,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -737,13 +739,31 @@ private fun TabItem(
     label: String, count: Int, selected: Boolean,
     onClick: () -> Unit, modifier: Modifier = Modifier,
 ) {
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) Emerald else Color.Transparent,
+        animationSpec = tween(250),
+        label = "tabBg",
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) Color.White else Gray500,
+        animationSpec = tween(250),
+        label = "tabText",
+    )
+    val badgeBg by animateColorAsState(
+        targetValue = if (selected) Color.White.copy(alpha = 0.25f) else Gray300.copy(alpha = 0.4f),
+        animationSpec = tween(250),
+        label = "tabBadgeBg",
+    )
+    val badgeTextColor by animateColorAsState(
+        targetValue = if (selected) Color.White else Gray500,
+        animationSpec = tween(250),
+        label = "tabBadgeText",
+    )
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(
-                color = if (selected) Emerald else Color.Transparent,
-                shape = RoundedCornerShape(20.dp),
-            )
+            .background(bgColor, RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center,
@@ -756,19 +776,19 @@ private fun TabItem(
             Text(label,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
-                color = if (selected) Color.White else Gray500)
+                color = textColor)
             Spacer(Modifier.width(5.dp))
             Box(
                 modifier = Modifier
                     .size(18.dp)
                     .clip(CircleShape)
-                    .background(if (selected) Color.White.copy(alpha = 0.25f) else Gray300.copy(alpha = 0.4f)),
+                    .background(badgeBg, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text("$count",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                    color = if (selected) Color.White else Gray500)
+                    color = badgeTextColor)
             }
         }
     }
@@ -888,7 +908,7 @@ private fun RoleBadge(isActive: Boolean, onTap: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = if (isActive) Emerald50 else Color(0xFFFEF2F2),
-        modifier = Modifier.clickable(onClick = onTap),
+        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onTap),
     ) {
         Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically) {
@@ -1024,8 +1044,8 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 
 private fun latestChangelog(): List<String> {
     return listOf(
-        "Icon position fine-tuned (translateY 32)",
-        "Whitelist content top-aligned (fillMaxSize on scrollable Column)",
-        "Notification counter: fixed double-count when initialized from DB",
+        "Icon translateY 30, transparent status bar for light theme",
+        "Badge ripple clipped to pill shape",
+        "Animated tab pill transitions on swipe",
     )
 }
