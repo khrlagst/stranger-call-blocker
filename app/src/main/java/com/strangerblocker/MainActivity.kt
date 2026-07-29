@@ -9,11 +9,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import com.strangerblocker.ui.MainScreen
+import com.strangerblocker.ui.MainViewModel
 import com.strangerblocker.ui.theme.StrangerBlockerTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: MainViewModel by viewModels()
 
     private val roleRequestLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -38,13 +42,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             StrangerBlockerTheme {
-                MainScreen()
+                MainScreen(viewModel = viewModel)
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
+        viewModel.refreshRoleStatus()
     }
 
     private fun isRoleHeld(): Boolean {

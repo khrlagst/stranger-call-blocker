@@ -224,7 +224,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val showUpdateDialog = MutableStateFlow(false)
     val showAddWhitelistDialog = MutableStateFlow(false)
 
-    fun openAboutDialog() { showAboutDialog.value = true }
+    fun openAboutDialog() {
+        checkForUpdates()
+        showAboutDialog.value = true
+    }
     fun closeAboutDialog() { showAboutDialog.value = false }
 
     fun openUpdateDialog() { showUpdateDialog.value = true }

@@ -210,7 +210,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             // ── Shared card container ──
             Card(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -843,6 +843,8 @@ private fun ClearHistoryDialog(
 private fun ChangelogText() {
     Column {
         listOf(
+            "1.6.1" to "Toggle crash fix, tab pill badges, role refresh on resume",
+            "1.6.0" to "Tabs, dot indicator, update in About, clear confirmation dialog",
             "1.5.1" to "Header layout fixes, whitelist padding, bottom spacing",
             "1.5.0" to "UI redesign, emerald theme, about/update dialogs",
             "1.4.0" to "Larger header, badge in top bar, about dialog",
