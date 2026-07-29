@@ -1,6 +1,9 @@
 package com.strangerblocker.ui
 
 import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -90,7 +94,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val totalBlocked by viewModel.totalBlocked.collectAsState()
     val whitelisted by viewModel.whitelisted.collectAsState(initial = emptyList())
     val selectedTab by viewModel.selectedTab.collectAsState()
-    val exportIntent by viewModel.exportIntent.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val updateDownloading by viewModel.updateDownloading.collectAsState()
@@ -108,10 +111,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         } catch (_: Exception) { "?" }
     }
 
-    LaunchedEffect(exportIntent) {
-        exportIntent?.let {
-            context.startActivity(Intent.createChooser(it, "Export blocked calls"))
-            viewModel.clearExportIntent()
+    val saveCsvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.exportCsvToUri(uri)
         }
     }
 
@@ -226,7 +230,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         whitelistCount = whitelisted.size,
                         blockedCount = totalBlocked,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
-                        onExportCsv = { viewModel.exportCsv() },
+                        onExportCsv = { saveCsvLauncher.launch("blocked_calls.csv") },
                         onClearHistory = viewModel::openClearHistoryDialog,
                     )
 
@@ -500,14 +504,14 @@ private fun BlockedContent(
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             groups.forEach { group ->
-                item(key = "header_${group.header}") {
+                stickyHeader(key = "header_${group.header}") {
                     Text(
                         group.header,
                         style = MaterialTheme.typography.labelMedium,
                         color = Emerald,
-                        modifier = Modifier.padding(
-                            start = 12.dp, top = 8.dp, bottom = 2.dp,
-                        ),
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(start = 12.dp, top = 8.dp, bottom = 2.dp),
                     )
                 }
                 items(group.calls, key = { it.id }) { call ->
@@ -908,5 +912,5 @@ private fun ClearHistoryDialog(
 }
 
 private fun latestChangelog(): String {
-    return "1.7.2 — Version bump from 1.7.0, license, privacy section, README"
+    return "1.8.0 — Sticky section headers, direct CSV save to local storage (via document picker)"
 }

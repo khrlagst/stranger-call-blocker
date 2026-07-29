@@ -190,10 +190,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Export ──
 
-    private val _exportIntent = MutableStateFlow<Intent?>(null)
-    val exportIntent: StateFlow<Intent?> = _exportIntent.asStateFlow()
-
-    fun exportCsv() {
+    fun exportCsvToUri(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val ctx = getApplication<Application>()
@@ -205,22 +202,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         appendLine("${call.phoneNumber},${dateFmt.format(Date(call.blockedAtMillis))}")
                     }
                 }
-                val file = File(ctx.cacheDir, "blocked_calls.csv")
-                file.writeText(csv)
-                val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
-                _exportIntent.value = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/csv"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                ctx.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(csv.toByteArray())
                 }
             } catch (_: Exception) {
-                _exportIntent.value = null
+                // silent
             }
         }
-    }
-
-    fun clearExportIntent() {
-        _exportIntent.value = null
     }
 
     // ── Updates ──
