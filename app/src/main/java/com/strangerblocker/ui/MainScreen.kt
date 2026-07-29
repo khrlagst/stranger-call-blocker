@@ -78,6 +78,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
+import com.strangerblocker.ui.theme.ThemeMode
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -303,6 +304,9 @@ private fun HomeScreen(
                 )
             }
 
+            val pagerState = rememberPagerState(pageCount = { 2 })
+            val scope = rememberCoroutineScope()
+
             TabBar(
                 selectedTab = selectedTab,
                 whitelistCount = whitelisted.size,
@@ -313,9 +317,6 @@ private fun HomeScreen(
                 },
             )
             Spacer(Modifier.height(12.dp))
-
-            val pagerState = rememberPagerState(pageCount = { 2 })
-            val scope = rememberCoroutineScope()
 
             LaunchedEffect(pagerState.currentPage) {
                 val newTab = Tab.entries[pagerState.currentPage]
@@ -506,11 +507,13 @@ private fun SettingsScreen(
             Text("Theme",
                 style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
             Spacer(Modifier.height(8.dp))
-            listOf(
+            @Suppress("unchecked")
+            val themeOptions: List<Pair<ThemeMode, String>> = listOf(
                 ThemeMode.SYSTEM to "System",
                 ThemeMode.LIGHT to "Light",
                 ThemeMode.DARK to "Dark",
-            ).forEach { (mode, label) ->
+            )
+            themeOptions.forEach { (mode, label) ->
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clickable { onThemeChange(mode) }
