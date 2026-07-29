@@ -129,13 +129,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             ),
                             color = EmeraldDark,
                         )
-                        if (totalBlocked > 0) {
-                            Text(
-                                "$totalBlocked blocked",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Gray500,
-                            )
-                        }
+
                     }
                     RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
                     Spacer(Modifier.width(4.dp))
@@ -154,7 +148,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
         ) {
             Spacer(Modifier.height(8.dp))
 
@@ -420,15 +414,15 @@ private fun RoleBadge(isActive: Boolean, onTap: () -> Unit) {
 
 @Composable
 private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Default.PersonAdd, contentDescription = null,
-            modifier = Modifier.size(14.dp),
-            tint = Emerald.copy(alpha = 0.5f),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.PersonAdd, contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = Emerald.copy(alpha = 0.5f),
+            )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
