@@ -613,10 +613,15 @@ private fun AboutScreen(
             Text("What's new",
                 style = MaterialTheme.typography.labelLarge, color = EmeraldDark,
                 modifier = Modifier.padding(horizontal = 20.dp))
-            Spacer(Modifier.height(6.dp))
-            Text(latestChangelog(),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                latestChangelog().forEach { item ->
+                    Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                        Text("• ", style = MaterialTheme.typography.bodySmall, color = Emerald)
+                        Text(item, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
 
             // ── Spacer to push footer down ──
@@ -748,6 +753,7 @@ private fun WhitelistContent(
             entries.forEach { entry ->
                 WhitelistRow(number = entry.phoneNumber, label = entry.label,
                     onRemove = { onRemove(entry) })
+                HorizontalDivider(modifier = Modifier.padding(start = 36.dp), thickness = 0.5.dp)
             }
         }
     }
@@ -866,19 +872,27 @@ private fun AddWhitelistDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add to whitelist") },
+        title = { Text("Add to whitelist",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = EmeraldDark) },
         text = {
             Column {
                 OutlinedTextField(value = number, onValueChange = onNumberChange,
                     label = { Text("Phone number") }, singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(value = label, onValueChange = onLabelChange,
                     label = { Text("Label (optional)") }, singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth())
             }
         },
-        confirmButton = { TextButton(onClick = onAdd, enabled = number.isNotBlank()) { Text("Add") } },
+        confirmButton = {
+            TextButton(onClick = onAdd, enabled = number.isNotBlank()) {
+                Text("Add", color = if (number.isNotBlank()) Emerald else Gray300)
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -925,6 +939,10 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
     )
 }
 
-private fun latestChangelog(): String {
-    return "1.8.8 — Icon centering, circle with count replaces status bar icon via platform API"
+private fun latestChangelog(): List<String> {
+    return listOf(
+        "Icon centering and resizing",
+        "Circle with count replaces status bar icon via platform API",
+        "SetAutoCancel/setSilent fix for Notification.Builder",
+    )
 }

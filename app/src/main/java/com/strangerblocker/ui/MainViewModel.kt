@@ -162,6 +162,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setNotificationIconStyle(style: String) {
         prefs.edit().putString("notification_icon_style", style).apply()
         _notificationIconStyle.value = style
+        maybePostNotification()
     }
 
     fun toggleNotifications(enabled: Boolean) {
