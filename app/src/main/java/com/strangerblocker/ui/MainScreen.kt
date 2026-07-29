@@ -908,5 +908,5 @@ private fun ClearHistoryDialog(
 }
 
 private fun latestChangelog(): String {
-    return "1.7.1 — Notification count from DB, QS tile sync, toggle immediate effect, release notes from commits"
+    return "1.7.2 — Version bump from 1.7.0, license, privacy section, README"
 }
