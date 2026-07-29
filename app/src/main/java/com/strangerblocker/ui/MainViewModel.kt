@@ -117,6 +117,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isBlockingEnabled.value = enabled
     }
 
+    // ── Notifications ──
+
+    private val _notificationsEnabled = MutableStateFlow(
+        prefs.getBoolean("notifications_enabled", true)
+    )
+    val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
+
+    fun toggleNotifications(enabled: Boolean) {
+        prefs.edit().putBoolean("notifications_enabled", enabled).apply()
+        _notificationsEnabled.value = enabled
+    }
+
     // ── Role ──
 
     private val _isRoleHeld = MutableStateFlow(checkRoleHeld())

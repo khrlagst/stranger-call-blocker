@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Required: install downloaded APK updates (Android 8+) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Required: post block alerts (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".StrangerBlockerApp"
@@ -38,6 +40,19 @@
             android:permission="android.permission.BIND_SCREENING_SERVICE">
             <intent-filter>
                 <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
+
+        <!--
+            Quick Settings tile — allows toggling block state from the
+            notification shade without opening the app.
+        -->
+        <service
+            android:name=".service.BlockerTileService"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
 

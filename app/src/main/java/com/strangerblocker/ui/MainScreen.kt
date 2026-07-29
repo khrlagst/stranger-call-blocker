@@ -94,6 +94,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val updateInfo by viewModel.updateInfo.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val updateDownloading by viewModel.updateDownloading.collectAsState()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val showSettings by viewModel.showSettings.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
@@ -252,6 +253,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             appVersion = appVersion,
             updateInfo = updateInfo,
             updateDownloading = updateDownloading,
+            notificationsEnabled = notificationsEnabled,
+            onNotificationsToggle = viewModel::toggleNotifications,
             onDismiss = viewModel::closeSettings,
             onUpdateClick = {
                 viewModel.closeSettings()
@@ -673,6 +676,8 @@ private fun SettingsSheet(
     appVersion: String,
     updateInfo: UpdateInfo?,
     updateDownloading: Boolean,
+    notificationsEnabled: Boolean,
+    onNotificationsToggle: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onUpdateClick: () -> Unit,
 ) {
@@ -689,7 +694,7 @@ private fun SettingsSheet(
         },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                // ── Notifications section (placeholder for v1.7) ──
+                // ── Notifications section ──
                 Text(
                     "Notifications",
                     style = MaterialTheme.typography.labelLarge,
@@ -719,14 +724,16 @@ private fun SettingsSheet(
                                 color = Gray500,
                             )
                         }
+                        Switch(
+                            checked = notificationsEnabled,
+                            onCheckedChange = onNotificationsToggle,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Emerald,
+                                checkedTrackColor = Emerald.copy(alpha = 0.2f),
+                            ),
+                        )
                     }
                 }
-                Text(
-                    "Coming in v1.7",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Gray500.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(start = 12.dp, top = 4.dp),
-                )
 
                 Spacer(Modifier.height(20.dp))
                 HorizontalDivider()

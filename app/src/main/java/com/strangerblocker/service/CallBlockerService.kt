@@ -1,9 +1,16 @@
 package com.strangerblocker.service
 
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallScreeningService
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import com.strangerblocker.MainActivity
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import kotlinx.coroutines.CoroutineScope
@@ -11,6 +18,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class CallBlockerService : CallScreeningService() {
 
@@ -58,13 +68,16 @@ class CallBlockerService : CallScreeningService() {
             )
 
             scope.launch {
-                val db = (applicationContext as StrangerBlockerApp).db
-                db.blockedCallDao().insert(
+                val app = applicationContext as StrangerBlockerApp
+                app.db.blockedCallDao().insert(
                     BlockedCall(
                         phoneNumber = phoneNumber,
                         blockedAtMillis = System.currentTimeMillis(),
                     )
                 )
+                // Notification is posted after DB save - uses the shared preference
+                // checked inside postBlockedNotification()
+                postBlockedNotification(app)
             }
         }
     }
@@ -72,6 +85,11 @@ class CallBlockerService : CallScreeningService() {
     private fun isBlockingEnabled(): Boolean {
         val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
         return prefs.getBoolean("blocking_enabled", true)
+    }
+
+    private fun isNotificationsEnabled(): Boolean {
+        val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
+        return prefs.getBoolean("notifications_enabled", true)
     }
 
     private fun isWhitelisted(number: String): Boolean {
@@ -98,5 +116,42 @@ class CallBlockerService : CallScreeningService() {
         } catch (_: SecurityException) {
             false
         }
+    }
+
+    private fun postBlockedNotification(app: StrangerBlockerApp) {
+        if (!isNotificationsEnabled()) return
+
+        val todayKey = "blocked_today_${todayDate()}"
+        val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
+        val count = prefs.getInt(todayKey, 0)
+        prefs.edit().putInt(todayKey, count + 1).apply()
+
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+        val notification = NotificationCompat.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("${count + 1} blocked today")
+            .setContentText("Stranger Blocker is active")
+            .setNumber(count + 1)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(false)
+            .setSilent(true)
+            .build()
+
+        NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun todayDate(): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    }
+
+    companion object {
+        private const val NOTIFICATION_ID = 1001
     }
 }
