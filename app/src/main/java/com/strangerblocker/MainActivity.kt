@@ -11,6 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.strangerblocker.ui.MainScreen
 import com.strangerblocker.ui.MainViewModel
 import com.strangerblocker.ui.theme.StrangerBlockerTheme
@@ -41,7 +43,8 @@ class MainActivity : ComponentActivity() {
         requestContactsPermission()
 
         setContent {
-            StrangerBlockerTheme {
+            val themeMode by viewModel.themeMode.collectAsState()
+            StrangerBlockerTheme(themeMode = themeMode) {
                 MainScreen(viewModel = viewModel)
             }
         }

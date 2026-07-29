@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +62,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -102,6 +106,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val updateDownloading by viewModel.updateDownloading.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val notificationIconStyle by viewModel.notificationIconStyle.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
     val showAddWhitelistDialog by viewModel.showAddWhitelistDialog.collectAsState()
@@ -146,6 +151,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 onNotificationsToggle = viewModel::toggleNotifications,
                 notificationIconStyle = notificationIconStyle,
                 onIconStyleChange = viewModel::setNotificationIconStyle,
+                themeMode = themeMode,
+                onThemeChange = viewModel::setThemeMode,
                 onAbout = { viewModel.navigateTo(Screen.ABOUT) },
                 onBack = viewModel::goHome,
             )
@@ -300,16 +307,27 @@ private fun HomeScreen(
                 selectedTab = selectedTab,
                 whitelistCount = whitelisted.size,
                 blockedCount = totalBlocked,
-                onSelectTab = onSelectTab,
+                onSelectTab = { tab ->
+                    onSelectTab(tab)
+                    scope.launch { pagerState.animateScrollToPage(tab.ordinal) }
+                },
             )
             Spacer(Modifier.height(12.dp))
+
+            val pagerState = rememberPagerState(pageCount = { 2 })
+            val scope = rememberCoroutineScope()
+
+            LaunchedEffect(pagerState.currentPage) {
+                val newTab = Tab.entries[pagerState.currentPage]
+                if (newTab != selectedTab) onSelectTab(newTab)
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 ),
             ) {
                 Column(Modifier.fillMaxSize()) {
@@ -321,15 +339,17 @@ private fun HomeScreen(
                         onClearHistory = onClearHistory,
                     )
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        when (selectedTab) {
-                            Tab.WHITELIST -> WhitelistContent(
-                                entries = whitelisted,
-                                onRemove = onRemoveWhitelist,
-                            )
-                            Tab.BLOCKED -> BlockedContent(
-                                groups = groupedCalls,
-                                onWhitelist = onWhitelistCall,
-                            )
+                        HorizontalPager(state = pagerState) { page ->
+                            when (page) {
+                                0 -> WhitelistContent(
+                                    entries = whitelisted,
+                                    onRemove = onRemoveWhitelist,
+                                )
+                                1 -> BlockedContent(
+                                    groups = groupedCalls,
+                                    onWhitelist = onWhitelistCall,
+                                )
+                            }
                         }
                     }
                 }
@@ -347,6 +367,8 @@ private fun SettingsScreen(
     onNotificationsToggle: (Boolean) -> Unit,
     notificationIconStyle: String,
     onIconStyleChange: (String) -> Unit,
+    themeMode: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
     onAbout: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -473,6 +495,36 @@ private fun SettingsScreen(
                         color = EmeraldDark)
                     Text("Status bar shows a circle with today's blocked count",
                         style = MaterialTheme.typography.labelSmall, color = Gray500)
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
+            // Theme section
+            Text("Theme",
+                style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
+            Spacer(Modifier.height(8.dp))
+            listOf(
+                ThemeMode.SYSTEM to "System",
+                ThemeMode.LIGHT to "Light",
+                ThemeMode.DARK to "Dark",
+            ).forEach { (mode, label) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable { onThemeChange(mode) }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
+                        selected = themeMode == mode,
+                        onClick = { onThemeChange(mode) },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(label,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = EmeraldDark)
                 }
             }
 
@@ -647,11 +699,17 @@ private fun TabBar(
     blockedCount: Int,
     onSelectTab: (Tab) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth()) {
-        TabItem("Whitelist", whitelistCount, selectedTab == Tab.WHITELIST,
-            { onSelectTab(Tab.WHITELIST) }, Modifier.weight(1f))
-        TabItem("Blocked", blockedCount, selectedTab == Tab.BLOCKED,
-            { onSelectTab(Tab.BLOCKED) }, Modifier.weight(1f))
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(modifier = Modifier.padding(3.dp)) {
+            TabItem("Whitelist", whitelistCount, selectedTab == Tab.WHITELIST,
+                { onSelectTab(Tab.WHITELIST) }, Modifier.weight(1f))
+            TabItem("Blocked", blockedCount, selectedTab == Tab.BLOCKED,
+                { onSelectTab(Tab.BLOCKED) }, Modifier.weight(1f))
+        }
     }
 }
 
@@ -660,34 +718,29 @@ private fun TabItem(
     label: String, count: Int, selected: Boolean,
     onClick: () -> Unit, modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) Emerald else Color.Transparent,
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
     ) {
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        ) {
             Text(label,
                 style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp),
-                color = if (selected) EmeraldDark else Gray500)
-            Spacer(Modifier.width(6.dp))
-            Box(
-                modifier = Modifier
-                    .background(
-                        color = if (selected) Emerald else Gray300.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(10.dp))
-                    .padding(horizontal = 7.dp, vertical = 1.dp),
-            ) {
-                Text("$count",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                    color = if (selected) Color.White else Gray500)
-            }
+                    fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
+                color = if (selected) Color.White else Gray500)
+            Spacer(Modifier.width(5.dp))
+            Text("$count",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                color = if (selected) Color.White.copy(alpha = 0.8f) else Gray500)
         }
-        Spacer(Modifier.height(10.dp))
-        Box(
-            modifier = Modifier.fillMaxWidth().height(2.dp)
-                .background(if (selected) Emerald else Color.Transparent)
-        )
     }
 }
 
@@ -783,7 +836,7 @@ private fun BlockedContent(
                 stickyHeader(key = "header_${group.header}") {
                     Box(
                         modifier = Modifier.fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surface)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(start = 12.dp, top = 8.dp, bottom = 2.dp),
                     ) {
                         Text("${group.header} (${group.calls.size})",
@@ -941,8 +994,9 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 
 private fun latestChangelog(): List<String> {
     return listOf(
-        "Icon centering and resizing",
-        "Circle with count replaces status bar icon via platform API",
-        "SetAutoCancel/setSilent fix for Notification.Builder",
+        "Theme support with Light, Dark, System modes (Settings)",
+        "Redesigned tab bar with pill buttons and swipe gesture",
+        "Dark mode contrast: elevated card surfaces (#1E1E1E)",
+        "App drawer icon centered and resized",
     )
 }

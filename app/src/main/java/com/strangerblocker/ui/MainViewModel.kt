@@ -25,6 +25,7 @@ import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.UpdateChecker
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
+import com.strangerblocker.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -163,6 +164,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit().putString("notification_icon_style", style).apply()
         _notificationIconStyle.value = style
         maybePostNotification()
+    }
+
+    // ── Theme ──
+
+    private val _themeMode = MutableStateFlow(
+        try { ThemeMode.valueOf(prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM") }
+        catch (_: Exception) { ThemeMode.SYSTEM }
+    )
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
+    fun setThemeMode(mode: ThemeMode) {
+        prefs.edit().putString("theme_mode", mode.name).apply()
+        _themeMode.value = mode
     }
 
     fun toggleNotifications(enabled: Boolean) {

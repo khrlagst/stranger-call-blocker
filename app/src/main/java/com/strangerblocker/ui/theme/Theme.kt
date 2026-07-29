@@ -6,6 +6,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 private val LightColorScheme = lightColorScheme(
     primary = LightPrimary,
     onPrimary = LightOnPrimary,
@@ -27,7 +29,7 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = DarkOnPrimary,
     surface = DarkSurface,
     onSurface = DarkOnSurface,
-    surfaceVariant = DarkSurface,
+    surfaceVariant = DarkSurfaceElevated,
     onSurfaceVariant = DarkOnSurfaceMuted,
     outline = DarkOutline,
     outlineVariant = DarkOutline,
@@ -40,11 +42,16 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun StrangerBlockerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
+    val isDark = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        colorScheme = if (isDark) DarkColorScheme else LightColorScheme,
         content = content,
     )
 }

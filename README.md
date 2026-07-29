@@ -143,6 +143,7 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.9.0** | Theme support (Light/Dark/System), pill tabs with swipe, dark mode contrast, icon centering |
 | **1.8.9** | Smooth icon switching, bullet changelog, icon resize, whitelist dividers, dialog revamp |
 | **1.8.8** | Icon centering & resizing, circle with count replaces status bar icon, README fix |
 | **1.8.7** | Icon resize, circle icon in ViewModel, auto-start notification on app open |
