@@ -259,8 +259,8 @@ private fun BottomNavBar(selectedTab: BottomNavTab, onSelectTab: (BottomNavTab) 
             NavigationBarItem(
                 selected = selectedTab == item.tab,
                 onClick = { onSelectTab(item.tab) },
-                icon = { Icon(item.icon, contentDescription = item.label, tint = if (selectedTab == item.tab) Emerald else Gray300) },
-                label = { Text(item.label, fontSize = 10.sp, color = if (selectedTab == item.tab) Emerald else Gray300) },
+                icon = { Icon(item.icon, contentDescription = item.label, tint = if (selectedTab == item.tab) Emerald else Gray500) },
+                label = { Text(item.label, fontSize = 10.sp, color = if (selectedTab == item.tab) Emerald else Gray500) },
                 colors = NavigationBarItemDefaults.colors(indicatorColor = Emerald50),
             )
         }
@@ -272,6 +272,7 @@ private fun BottomNavBar(selectedTab: BottomNavTab, onSelectTab: (BottomNavTab) 
 @Composable
 private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
     val todayCount = groupedCalls.firstOrNull()?.calls?.size ?: 0
+    val thisWeekCount = groupedCalls.takeWhile { it.header != "Earlier" }.sumOf { it.calls.size }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -288,7 +289,7 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
         HorizontalDivider()
         Spacer(Modifier.height(16.dp))
 
-        // Today card
+        // Total Blocked Today
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -297,20 +298,51 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
         ) {
             Column(Modifier.padding(20.dp)) {
                 Text("Total Blocked Today",
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp),
-                    color = Gray500)
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
                 Spacer(Modifier.height(4.dp))
                 Text("$todayCount",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                    color = EmeraldDark)
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
                 Spacer(Modifier.height(4.dp))
-                Text("$totalBlocked total all time",
+                Text("$thisWeekCount calls this week · $totalBlocked all time",
                     style = MaterialTheme.typography.bodySmall, color = Gray500)
             }
         }
         Spacer(Modifier.height(12.dp))
 
-        // Weekly breakdown
+        // Calls This Week + All Time side by side
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Calls This Week",
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                    Spacer(Modifier.height(4.dp))
+                    Text("$thisWeekCount",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                }
+            }
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("All Time",
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                    Spacer(Modifier.height(4.dp))
+                    Text("$totalBlocked",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        // Weekly chart
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -318,27 +350,39 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Column(Modifier.padding(20.dp)) {
-                Text("Weekly Overview",
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp),
-                    color = Gray500)
-                Spacer(Modifier.height(12.dp))
-                groupedCalls.forEach { group ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(group.header,
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = EmeraldDark, modifier = Modifier.weight(1f))
-                        Text("${group.calls.size}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = EmeraldDark)
-                    }
-                }
+                Text("Weekly Activity",
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+
                 if (groupedCalls.isEmpty()) {
-                    Text("No calls blocked yet",
-                        style = MaterialTheme.typography.bodySmall, color = Gray500.copy(alpha = 0.6f))
+                    Spacer(Modifier.height(16.dp))
+                    Text("No data yet", style = MaterialTheme.typography.bodySmall, color = Gray500.copy(alpha = 0.6f))
+                } else {
+                    Spacer(Modifier.height(16.dp))
+                    val maxCount = groupedCalls.maxOf { it.calls.size }.coerceAtLeast(1)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        groupedCalls.forEach { group ->
+                            val barHeight = (group.calls.size.toFloat() / maxCount * 120f).toInt().coerceAtLeast(4)
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("${group.calls.size}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = Gray500)
+                                Spacer(Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(barHeight.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(if (group.header == "Today") Emerald else Emerald.copy(alpha = 0.5f)),
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(group.header.take(3),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = Gray500)
+                            }
+                        }
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(80.dp)) // room for bottom nav
+        Spacer(Modifier.height(80.dp))
     }
 }
 

@@ -11,16 +11,19 @@ data class UpdateInfo(
     val downloadUrl: String,
     val releaseNotes: String,
 ) {
-    /** True if this version is newer than [current] (semver compare). */
+    /** True if this version is newer than [current] (semver compare, handles -pNN preview suffix). */
     fun isNewerThan(current: String): Boolean {
-        val l = latestVersion.split(".").map { it.toIntOrNull() ?: 0 }
-        val c = current.split(".").map { it.toIntOrNull() ?: 0 }
+        val l = latestVersion.split("-")[0].split(".").map { it.toIntOrNull() ?: 0 }
+        val c = current.split("-")[0].split(".").map { it.toIntOrNull() ?: 0 }
         for (i in 0 until maxOf(l.size, c.size)) {
             val lv = l.getOrElse(i) { 0 }
             val cv = c.getOrElse(i) { 0 }
             if (lv != cv) return lv > cv
         }
-        return false
+        // Same base version — compare preview suffix. Higher = newer.
+        val lp = latestVersion.split("-").getOrElse(1) { "" }.removePrefix("p").toIntOrNull() ?: Int.MAX_VALUE
+        val cp = current.split("-").getOrElse(1) { "" }.removePrefix("p").toIntOrNull() ?: Int.MAX_VALUE
+        return lp > cp
     }
 }
 
