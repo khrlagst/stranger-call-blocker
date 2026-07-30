@@ -156,41 +156,59 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 
     // ── Main layout with bottom nav ──
     Box(Modifier.fillMaxSize()) {
-        when (bottomNavTab) {
-            BottomNavTab.DASHBOARD -> DashboardScreen(
-                totalBlocked = totalBlocked,
-                groupedCalls = groupedCalls,
-            )
-            BottomNavTab.CALLS -> CallsScreen(
-                isBlockingEnabled = isBlockingEnabled,
-                isRoleHeld = isRoleHeld,
-                groupedCalls = groupedCalls,
-                totalBlocked = totalBlocked,
-                whitelisted = whitelisted,
-                selectedTab = selectedTab,
-                onToggleBlocking = viewModel::toggleBlocking,
-                onRefreshRole = viewModel::refreshRoleStatus,
-                onSelectTab = viewModel::selectTab,
-                onAddToWhitelist = viewModel::openAddWhitelistDialog,
-                onExportCsv = { saveCsvLauncher.launch("blocked_calls.csv") },
-                onClearHistory = viewModel::openClearHistoryDialog,
-                onRemoveWhitelist = { viewModel.removeFromWhitelist(it.phoneNumber) },
-                onWhitelistCall = { viewModel.addToWhitelist(it.phoneNumber, null) },
-            )
-            BottomNavTab.SMS -> SmsScreen()
-            BottomNavTab.SETTINGS -> SettingsTab(
-                notificationsEnabled = notificationsEnabled,
-                onNotificationsToggle = viewModel::toggleNotifications,
-                notificationIconStyle = notificationIconStyle,
-                onIconStyleChange = viewModel::setNotificationIconStyle,
-                themeMode = themeMode,
-                onThemeChange = viewModel::setThemeMode,
-                previewUpdates = previewUpdates,
-                onPreviewToggle = viewModel::togglePreviewUpdates,
-                updateAvailable = updateAvailable,
-                onAbout = viewModel::openAbout,
-                onBack = {},
-            )
+        Column(Modifier.fillMaxSize()) {
+            // Shared header (title + badge across all tabs)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Stranger Blocker",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = EmeraldDark, modifier = Modifier.weight(1f))
+                RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
+            }
+            HorizontalDivider(thickness = 1.dp)
+
+            // Tab content
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (bottomNavTab) {
+                    BottomNavTab.DASHBOARD -> DashboardScreen(
+                        totalBlocked = totalBlocked,
+                        groupedCalls = groupedCalls,
+                    )
+                    BottomNavTab.CALLS -> CallsContent(
+                        isBlockingEnabled = isBlockingEnabled,
+                        groupedCalls = groupedCalls,
+                        totalBlocked = totalBlocked,
+                        whitelisted = whitelisted,
+                        selectedTab = selectedTab,
+                        onToggleBlocking = viewModel::toggleBlocking,
+                        onSelectTab = viewModel::selectTab,
+                        onAddToWhitelist = viewModel::openAddWhitelistDialog,
+                        onExportCsv = { saveCsvLauncher.launch("blocked_calls.csv") },
+                        onClearHistory = viewModel::openClearHistoryDialog,
+                        onRemoveWhitelist = { viewModel.removeFromWhitelist(it.phoneNumber) },
+                        onWhitelistCall = { viewModel.addToWhitelist(it.phoneNumber, null) },
+                    )
+                    BottomNavTab.SMS -> SmsScreen()
+                    BottomNavTab.SETTINGS -> SettingsTab(
+                        notificationsEnabled = notificationsEnabled,
+                        onNotificationsToggle = viewModel::toggleNotifications,
+                        notificationIconStyle = notificationIconStyle,
+                        onIconStyleChange = viewModel::setNotificationIconStyle,
+                        themeMode = themeMode,
+                        onThemeChange = viewModel::setThemeMode,
+                        previewUpdates = previewUpdates,
+                        onPreviewToggle = viewModel::togglePreviewUpdates,
+                        updateAvailable = updateAvailable,
+                        onAbout = viewModel::openAbout,
+                        onBack = {},
+                    )
+                }
+            }
         }
 
         // Bottom nav overlay
@@ -277,16 +295,6 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
     ) {
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars),
-        ) {
-            Text("Stranger Blocker",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = EmeraldDark)
-        }
-        Spacer(Modifier.height(12.dp))
-        HorizontalDivider()
         Spacer(Modifier.height(16.dp))
 
         // Total Blocked Today
@@ -441,17 +449,14 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
 
 // ── Calls Tab ──
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CallsScreen(
+private fun CallsContent(
     isBlockingEnabled: Boolean,
-    isRoleHeld: Boolean,
     groupedCalls: List<CallGroup>,
     totalBlocked: Int,
     whitelisted: List<WhitelistedNumber>,
     selectedTab: Tab,
     onToggleBlocking: (Boolean) -> Unit,
-    onRefreshRole: () -> Unit,
     onSelectTab: (Tab) -> Unit,
     onAddToWhitelist: () -> Unit,
     onExportCsv: () -> Unit,
@@ -467,25 +472,7 @@ private fun CallsScreen(
         if (newTab != selectedTab) onSelectTab(newTab)
     }
 
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Stranger Blocker",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = EmeraldDark)
-            }
-            RoleBadge(isActive = isRoleHeld, onTap = onRefreshRole)
-        }
-        HorizontalDivider(thickness = 1.dp)
-        Spacer(Modifier.height(8.dp))
-
-        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 80.dp)) {
+    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 100.dp)) {
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -545,7 +532,6 @@ private fun CallsScreen(
                         }
                     }
                 }
-            }
         }
     }
 }
@@ -557,16 +543,6 @@ private fun SmsScreen() {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
     ) {
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars),
-        ) {
-            Text("Stranger Blocker",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = EmeraldDark)
-        }
-        Spacer(Modifier.height(12.dp))
-        HorizontalDivider()
         Spacer(Modifier.height(24.dp))
 
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -607,19 +583,6 @@ private fun SettingsTab(
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Stranger Blocker",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = EmeraldDark)
-        }
-        HorizontalDivider()
-
         Column(
             modifier = Modifier.fillMaxSize()
                 .padding(horizontal = 20.dp, vertical = 16.dp)
@@ -829,7 +792,7 @@ private fun TabBar(
 
 @Composable
 private fun TabItem(label: String, count: Int, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier.clickable(onClick = onClick).height(36.dp),
+    Row(modifier = modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick).height(36.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Text(label, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
             color = if (selected) Color.White else Gray500)
@@ -962,12 +925,17 @@ private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (S
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add to whitelist", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark) },
-        text = { Column {
-            OutlinedTextField(value = number, onValueChange = onNumberChange, label = { Text("Phone number") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(value = label, onValueChange = onLabelChange, label = { Text("Label (optional)") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
-        } },
-        confirmButton = { TextButton(onClick = onAdd, enabled = number.isNotBlank()) { Text("Add", color = if (number.isNotBlank()) Emerald else Gray300) } },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(value = number, onValueChange = onNumberChange, label = { Text("Phone number") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = label, onValueChange = onLabelChange, label = { Text("Label (optional)") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onAdd, enabled = number.isNotBlank()) {
+                Text("Add", color = if (number.isNotBlank()) Emerald else Gray300, fontWeight = FontWeight.Bold)
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -1002,10 +970,10 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Bottom navigation with 4 tabs (Dashboard, Calls, SMS, Settings)",
-    "Dashboard with today count and weekly overview",
-    "Settings moved from dialog to full tab",
-    "Preview builds toggle in Settings (opt into pre-release updates)",
+    "Shared header across all tabs with Active badge",
+    "Dashboard: full cards set, chart legend, bars from bottom",
+    "Calls: fixed padding, tab ripple shape, extra brace removed",
+    "Preview builds: check triggers on toggle, version compare fixed",
 )
 
 

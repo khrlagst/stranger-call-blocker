@@ -190,6 +190,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun togglePreviewUpdates(enabled: Boolean) {
         prefs.edit().putBoolean("preview_updates", enabled).apply()
         _previewUpdates.value = enabled
+        checkForUpdates()
     }
 
     fun toggleNotifications(enabled: Boolean) {
