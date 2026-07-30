@@ -31,4 +31,14 @@ interface BlockedCallDao {
     /** Count of calls blocked since [since] millis (used for daily notification). */
     @Query("SELECT COUNT(*) FROM blocked_calls WHERE blockedAtMillis >= :since")
     suspend fun countSince(since: Long): Int
+
+    /** Count of calls blocked on each of the last 7 days. */
+    @Query("""
+        SELECT CAST(blockedAtMillis / 86400000 AS INTEGER) AS dayBucket, COUNT(*) AS cnt
+        FROM blocked_calls WHERE blockedAtMillis >= :sevenDaysAgo
+        GROUP BY dayBucket ORDER BY dayBucket ASC
+    """)
+    suspend fun dailyCountsLast7(sevenDaysAgo: Long): List<DayCount>
 }
+
+data class DayCount(val dayBucket: Long, val cnt: Int)

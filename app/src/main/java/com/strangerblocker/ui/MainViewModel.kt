@@ -23,6 +23,7 @@ import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.BlockedSms
+import com.strangerblocker.data.DayCount
 import com.strangerblocker.data.UpdateChecker
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
@@ -97,6 +98,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val totalBlocked: StateFlow<Int> = blockedCalls.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    /** Daily counts for the last 7 days — 0=Monday .. 6=Sunday. */
+    val weeklyCounts: StateFlow<List<Int>> = blockedCalls.map { calls ->
+        val cal = Calendar.getInstance()
+        val nowMillis = cal.timeInMillis
+        // Compute day-of-week index for each of the last 7 days (Mon=0..Sun=6)
+        val todayDoy = cal.get(Calendar.DAY_OF_WEEK)
+        val monOffset = (todayDoy - Calendar.MONDAY + 7) % 7
+        val midnightToday = nowMillis - (cal.get(Calendar.HOUR_OF_DAY) * 3600000L
+            + cal.get(Calendar.MINUTE) * 60000L + cal.get(Calendar.SECOND) * 1000L
+            + cal.get(Calendar.MILLISECOND))
+        val dayStart = midnightToday - monOffset * 86400000L
+        val buckets = LongArray(7) { dayStart + it * 86400000L }
+        val counts = IntArray(7)
+        for (call in calls) {
+            for (i in 0..6) {
+                val end = if (i < 6) buckets[i + 1] else Long.MAX_VALUE
+                if (call.blockedAtMillis in buckets[i] until end) { counts[i]++; break }
+            }
+        }
+        counts.toList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), List(7) { 0 })
 
     // ── Tab selection ──
 
