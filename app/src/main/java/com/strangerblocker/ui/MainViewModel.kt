@@ -335,7 +335,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateDownloading = MutableStateFlow(false)
     val updateDownloading: StateFlow<Boolean> = _updateDownloading.asStateFlow()
 
+    private val _checkingForUpdates = MutableStateFlow(false)
+    val checkingForUpdates: StateFlow<Boolean> = _checkingForUpdates.asStateFlow()
+
     fun checkForUpdates() {
+        if (_checkingForUpdates.value) return
+        _checkingForUpdates.value = true
+        _updateInfo.value = null
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val ctx = getApplication<Application>()
@@ -343,12 +349,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .getPackageInfo(ctx.packageName, 0)
                     .versionName ?: "0.0.0"
                 val wantPreview = _previewUpdates.value || currentVer.contains("-p")
-                val info = UpdateChecker.check(currentVer, wantPreview) ?: return@launch
-                if (info.isNewerThan(currentVer) && info.latestVersion != currentVer) {
+                val info = UpdateChecker.check(currentVer, wantPreview)
+                if (info != null && info.isNewerThan(currentVer) && info.latestVersion != currentVer) {
                     _updateInfo.value = info
                 }
             } catch (_: Exception) {
                 // silent — network error or rate limit
+            } finally {
+                _checkingForUpdates.value = false
             }
         }
     }

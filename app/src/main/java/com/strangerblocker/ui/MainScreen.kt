@@ -111,6 +111,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val updateInfo by viewModel.updateInfo.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val updateDownloading by viewModel.updateDownloading.collectAsState()
+    val checkingForUpdates by viewModel.checkingForUpdates.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val smsBlockingEnabled by viewModel.smsBlockingEnabled.collectAsState()
     val groupedBlockedSms by viewModel.groupedBlockedSms.collectAsState()
@@ -143,6 +144,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             appVersion = appVersion,
             updateInfo = updateInfo,
             updateDownloading = updateDownloading,
+            checkingForUpdates = checkingForUpdates,
+            onCheckForUpdates = viewModel::checkForUpdates,
             onUpdateClick = {
                 viewModel.closeAbout()
                 viewModel.openUpdateDialog()
@@ -738,6 +741,8 @@ private fun AboutScreen(
     appVersion: String,
     updateInfo: UpdateInfo?,
     updateDownloading: Boolean,
+    checkingForUpdates: Boolean,
+    onCheckForUpdates: () -> Unit,
     onUpdateClick: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -766,11 +771,29 @@ private fun AboutScreen(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Spacer(Modifier.height(24.dp))
 
-            if (updateInfo != null) {
-                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable(onClick = onUpdateClick)) {
+            // Check for updates button
+            Surface(shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+                    .clickable(enabled = !checkingForUpdates, onClick = onCheckForUpdates)) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (checkingForUpdates) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Checking for updates\u2026", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else if (updateInfo != null) {
+                        Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Update to v${updateInfo.latestVersion}", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                    } else {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Check for updates", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
                     Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
@@ -783,7 +806,6 @@ private fun AboutScreen(
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
-            }
 
             Text("What's new", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 20.dp))

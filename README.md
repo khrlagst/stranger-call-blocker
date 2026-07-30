@@ -133,6 +133,7 @@ Stranger Blocker is designed to be privacy-first:
 - **No analytics, no tracking, no ads.** The app contains zero third-party analytics SDKs, crash reporters, or advertising libraries.
 - **Contacts are read only for screening.** The app queries `ContactsContract.PhoneLookup` at call time to determine if the caller is known. Contact data is never stored, logged, or transmitted.
 - **Internet access is used only for OTA updates.** A single request checks `api.github.com/repos/khrlagst/stranger-call-blocker/releases/latest` to compare versions. No telemetry, no pings, no usage stats.
+- **`RECEIVE_SMS` permission** is required for SMS blocking. Play Protect may flag this because the app is not on the Play Store — this is a false positive. The app never stores message body text beyond what's needed for the blocked log, never transmits SMS data, and never reads existing messages on the device.
 - **No account required.** There is no sign-in, no registration, no cloud sync.
 
 The APK is built from source via GitHub Actions. You can verify every release by building from source yourself — no binary transparency needed because the source is the trust anchor.
