@@ -54,6 +54,13 @@ enum class Screen {
     ABOUT,
 }
 
+enum class BottomNavTab {
+    DASHBOARD,
+    CALLS,
+    SMS,
+    SETTINGS,
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs: SharedPreferences =
@@ -328,18 +335,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ── Navigation ──
+    // ── Bottom Navigation ──
 
-    val currentScreen = MutableStateFlow(Screen.HOME)
+    val bottomNavTab = MutableStateFlow(BottomNavTab.CALLS)
 
-    fun navigateTo(screen: Screen) {
-        if (screen == Screen.SETTINGS || screen == Screen.ABOUT) {
-            checkForUpdates()
-        }
-        currentScreen.value = screen
+    fun selectBottomTab(tab: BottomNavTab) {
+        if (tab == BottomNavTab.SETTINGS) checkForUpdates()
+        bottomNavTab.value = tab
     }
 
-    fun goHome() { currentScreen.value = Screen.HOME }
+    // ── About sub-screen inside Settings ──
+
+    val showAbout = MutableStateFlow(false)
+
+    fun openAbout() {
+        checkForUpdates()
+        showAbout.value = true
+    }
+
+    fun closeAbout() { showAbout.value = false }
 
     // ── Dialogs ──
 
