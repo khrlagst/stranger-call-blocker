@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Required: post block alerts (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required: intercept incoming SMS -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <application
         android:name=".StrangerBlockerApp"
@@ -42,6 +44,19 @@
                 <action android:name="android.telecom.CallScreeningService" />
             </intent-filter>
         </service>
+
+        <!--
+            SMS Receiver — intercepts incoming SMS messages before they
+            reach the default SMS app. Works reliably on API < 31.
+        -->
+        <receiver
+            android:name=".receiver.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="1000">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
 
         <!--
             Quick Settings tile — allows toggling block state from the

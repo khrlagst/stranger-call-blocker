@@ -112,6 +112,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val updateDownloading by viewModel.updateDownloading.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
+    val smsBlockingEnabled by viewModel.smsBlockingEnabled.collectAsState()
+    val groupedBlockedSms by viewModel.groupedBlockedSms.collectAsState()
+    val totalSmsBlocked by viewModel.totalSmsBlocked.collectAsState()
     val notificationIconStyle by viewModel.notificationIconStyle.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val previewUpdates by viewModel.previewUpdates.collectAsState()
@@ -188,12 +191,21 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onRemoveWhitelist = { viewModel.removeFromWhitelist(it.phoneNumber) },
                         onWhitelistCall = { viewModel.addToWhitelist(it.phoneNumber, null) },
                     )
-                    BottomNavTab.SMS -> SmsScreen()
+                    BottomNavTab.SMS -> SmsScreen(
+                        smsBlockingEnabled = smsBlockingEnabled,
+                        onToggleSmsBlocking = viewModel::toggleSmsBlocking,
+                        groupedBlockedSms = groupedBlockedSms,
+                        totalSmsBlocked = totalSmsBlocked,
+                        whitelisted = whitelisted,
+                        onRemoveWhitelist = onRemoveWhitelist,
+                    )
                     BottomNavTab.SETTINGS -> SettingsTab(
                         notificationsEnabled = notificationsEnabled,
                         onNotificationsToggle = viewModel::toggleNotifications,
                         notificationIconStyle = notificationIconStyle,
                         onIconStyleChange = viewModel::setNotificationIconStyle,
+                        smsBlockingEnabled = smsBlockingEnabled,
+                        onSmsToggle = viewModel::toggleSmsBlocking,
                         themeMode = themeMode,
                         onThemeChange = viewModel::setThemeMode,
                         previewUpdates = previewUpdates,
@@ -534,28 +546,51 @@ private fun CallsContent(
 // ── SMS Tab ──
 
 @Composable
-private fun SmsScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-    ) {
-        Spacer(Modifier.height(24.dp))
-
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("📱",
-                    style = MaterialTheme.typography.displayMedium)
-                Spacer(Modifier.height(12.dp))
-                Text("SMS Blocking",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+private fun SmsScreen(
+    smsBlockingEnabled: Boolean,
+    onToggleSmsBlocking: (Boolean) -> Unit,
+    groupedBlockedSms: List<CallGroup>,
+    totalSmsBlocked: Int,
+    whitelisted: List<WhitelistedNumber>,
+    onRemoveWhitelist: (WhitelistedNumber) -> Unit,
+) {
+    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 100.dp)) {
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("Block stranger SMS",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(6.dp))
-                Text("Coming in a future preview",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(4.dp))
-                Text("SMS blocking will be available\nin preview p03 and beyond",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(horizontal = 40.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text(if (smsBlockingEnabled) "Messages from unknown numbers are silently blocked"
+                     else "All SMS messages ring through",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = smsBlockingEnabled, onCheckedChange = onToggleSmsBlocking,
+                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("Blocked", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            }
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (totalSmsBlocked == 0) {
+                        Text("No blocked SMS yet",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    } else {
+                        Text("$totalSmsBlocked blocked",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     }
@@ -569,6 +604,8 @@ private fun SettingsTab(
     onNotificationsToggle: (Boolean) -> Unit,
     notificationIconStyle: String,
     onIconStyleChange: (String) -> Unit,
+    smsBlockingEnabled: Boolean,
+    onSmsToggle: (Boolean) -> Unit,
     themeMode: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
     previewUpdates: Boolean,
@@ -622,6 +659,22 @@ private fun SettingsTab(
                 Spacer(Modifier.width(12.dp))
                 Column { Text("Circle with count", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
                     Text("Status bar shows a circle with today's blocked count", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
+            Text("SMS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Block stranger SMS", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                    Text("Silently block messages from unknown senders", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = smsBlockingEnabled, onCheckedChange = onSmsToggle,
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
 
             Spacer(Modifier.height(24.dp))

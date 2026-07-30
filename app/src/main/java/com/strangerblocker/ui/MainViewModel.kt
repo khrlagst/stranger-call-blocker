@@ -22,6 +22,7 @@ import com.strangerblocker.MainActivity
 import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
+import com.strangerblocker.data.BlockedSms
 import com.strangerblocker.data.UpdateChecker
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
@@ -123,6 +124,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             db.whitelistedNumberDao().delete(number)
         }
+    }
+
+    // ── SMS blocking ──
+
+    private val _smsBlockingEnabled = MutableStateFlow(
+        prefs.getBoolean("sms_blocking_enabled", false)
+    )
+    val smsBlockingEnabled: StateFlow<Boolean> = _smsBlockingEnabled.asStateFlow()
+
+    private val blockedSms: Flow<List<BlockedSms>> = db.blockedSmsDao().observeAll()
+
+    val groupedBlockedSms: StateFlow<List<CallGroup>> = blockedSms.map { smsList ->
+        val cal = Calendar.getInstance()
+        val today = cal.get(Calendar.DAY_OF_YEAR)
+        val todayYear = cal.get(Calendar.YEAR)
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterday = cal.get(Calendar.DAY_OF_YEAR)
+        smsList.groupBy { sms ->
+            cal.timeInMillis = sms.blockedAtMillis
+            val day = cal.get(Calendar.DAY_OF_YEAR)
+            val year = cal.get(Calendar.YEAR)
+            when { day == today && year == todayYear -> 0; day == yesterday && year == todayYear -> 1; year == todayYear -> 2; else -> 3 }
+        }.entries.sortedBy { it.key }.map { (key, group) ->
+            CallGroup(when (key) { 0 -> "Today"; 1 -> "Yesterday"; 2 -> "This Week"; else -> "Earlier" }, emptyList())
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalSmsBlocked: StateFlow<Int> = blockedSms.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    fun toggleSmsBlocking(enabled: Boolean) {
+        prefs.edit().putBoolean("sms_blocking_enabled", enabled).apply()
+        _smsBlockingEnabled.value = enabled
     }
 
     // ── Toggle ──
