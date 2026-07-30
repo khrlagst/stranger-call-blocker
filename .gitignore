@@ -14,3 +14,4 @@ ci.keystore
 *.html
 *.svg
 AGENTS.md
+.ui-craft/
