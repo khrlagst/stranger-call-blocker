@@ -32,14 +32,16 @@ object UpdateChecker {
         "https://api.github.com/repos/khrlagst/stranger-call-blocker/releases"
 
     /**
-     * Fetch the latest applicable release. If [currentVersion] contains `-p`
-     * (preview), searches all releases including pre-releases so preview
-     * builds can update to newer previews. Otherwise fetches only the latest
-     * stable release.
+     * Fetch the latest applicable release.
+     *
+     * @param currentVersion The currently installed version.
+     * @param includePreview If true, includes pre-release builds in the
+     *   search. Preview versions always set this, and stable users can opt
+     *   in via Settings.
      */
-    fun check(currentVersion: String = ""): UpdateInfo? {
-        val isPreview = currentVersion.contains("-p")
-        return if (isPreview) checkFromList(currentVersion) else checkLatest()
+    fun check(currentVersion: String = "", includePreview: Boolean = false): UpdateInfo? {
+        val wantPreview = includePreview || currentVersion.contains("-p")
+        return if (wantPreview) checkFromList(currentVersion) else checkLatest()
     }
 
     private fun checkLatest(): UpdateInfo? {

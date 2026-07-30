@@ -48,12 +48,6 @@ enum class Tab(val label: String) {
     BLOCKED("Blocked"),
 }
 
-enum class Screen {
-    HOME,
-    SETTINGS,
-    ABOUT,
-}
-
 enum class BottomNavTab {
     DASHBOARD,
     CALLS,
@@ -186,6 +180,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _themeMode.value = mode
     }
 
+    // ── Preview updates ──
+
+    private val _previewUpdates = MutableStateFlow(
+        prefs.getBoolean("preview_updates", false)
+    )
+    val previewUpdates: StateFlow<Boolean> = _previewUpdates.asStateFlow()
+
+    fun togglePreviewUpdates(enabled: Boolean) {
+        prefs.edit().putBoolean("preview_updates", enabled).apply()
+        _previewUpdates.value = enabled
+    }
+
     fun toggleNotifications(enabled: Boolean) {
         prefs.edit().putBoolean("notifications_enabled", enabled).apply()
         _notificationsEnabled.value = enabled
@@ -301,7 +307,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val currentVer = ctx.packageManager
                     .getPackageInfo(ctx.packageName, 0)
                     .versionName ?: "0.0.0"
-                val info = UpdateChecker.check(currentVer) ?: return@launch
+                val wantPreview = prefs.getBoolean("preview_updates", false) || currentVer.contains("-p")
+                val info = UpdateChecker.check(currentVer, wantPreview) ?: return@launch
                 if (info.isNewerThan(currentVer) && info.latestVersion != currentVer) {
                     _updateInfo.value = info
                 }

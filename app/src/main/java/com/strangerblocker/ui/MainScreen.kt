@@ -6,6 +6,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -111,6 +114,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val notificationIconStyle by viewModel.notificationIconStyle.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+    val previewUpdates by viewModel.previewUpdates.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
     val showAddWhitelistDialog by viewModel.showAddWhitelistDialog.collectAsState()
@@ -176,6 +180,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 onIconStyleChange = viewModel::setNotificationIconStyle,
                 themeMode = themeMode,
                 onThemeChange = viewModel::setThemeMode,
+                previewUpdates = previewUpdates,
+                onPreviewToggle = viewModel::togglePreviewUpdates,
                 updateAvailable = updateAvailable,
                 onAbout = viewModel::openAbout,
                 onBack = {},
@@ -493,6 +499,8 @@ private fun SettingsTab(
     onIconStyleChange: (String) -> Unit,
     themeMode: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
+    previewUpdates: Boolean,
+    onPreviewToggle: (Boolean) -> Unit,
     updateAvailable: Boolean,
     onAbout: () -> Unit,
     onBack: () -> Unit,
@@ -556,6 +564,22 @@ private fun SettingsTab(
                     Text(label, style = MaterialTheme.typography.bodySmall, color = EmeraldDark, modifier = Modifier.weight(1f))
                     if (themeMode == mode) Text("✓", color = Emerald, fontWeight = FontWeight.Bold)
                 }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
+            Text("Updates", style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Preview builds", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
+                    Text("Receive pre-release updates before stable release", style = MaterialTheme.typography.labelSmall, color = Gray500)
+                }
+                Switch(checked = previewUpdates, onCheckedChange = onPreviewToggle,
+                    colors = SwitchDefaults.colors(checkedThumbColor = Emerald, checkedTrackColor = Emerald.copy(alpha = 0.2f),
+                        uncheckedThumbColor = Gray500, uncheckedTrackColor = Gray300.copy(alpha = 0.4f)))
             }
 
             Spacer(Modifier.height(24.dp))
@@ -866,7 +890,7 @@ private fun latestChangelog(): List<String> = listOf(
     "Bottom navigation with 4 tabs (Dashboard, Calls, SMS, Settings)",
     "Dashboard with today count and weekly overview",
     "Settings moved from dialog to full tab",
-    "About as a sub-screen with back navigation",
+    "Preview builds toggle in Settings (opt into pre-release updates)",
 )
 
 
