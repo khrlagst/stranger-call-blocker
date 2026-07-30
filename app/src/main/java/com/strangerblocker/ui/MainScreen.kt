@@ -37,7 +37,11 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Shield
@@ -54,6 +58,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -240,10 +245,10 @@ private data class NavItem(val tab: BottomNavTab, val icon: ImageVector, val lab
 @Composable
 private fun BottomNavBar(selectedTab: BottomNavTab, onSelectTab: (BottomNavTab) -> Unit) {
     val items = listOf(
-        NavItem(BottomNavTab.DASHBOARD, Icons.Default.Shield, "Dashboard"),
-        NavItem(BottomNavTab.CALLS, Icons.Default.Block, "Calls"),
-        NavItem(BottomNavTab.SMS, Icons.Default.PersonAdd, "SMS"),
-        NavItem(BottomNavTab.SETTINGS, Icons.Default.ClearAll, "Settings"),
+        NavItem(BottomNavTab.DASHBOARD, Icons.Default.Dashboard, "Dashboard"),
+        NavItem(BottomNavTab.CALLS, Icons.Default.Phone, "Calls"),
+        NavItem(BottomNavTab.SMS, Icons.Default.Sms, "SMS"),
+        NavItem(BottomNavTab.SETTINGS, Icons.Default.Settings, "Settings"),
     )
 
     NavigationBar(
@@ -444,7 +449,7 @@ private fun CallsScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(80.dp))
         }
     }
 }
@@ -543,13 +548,26 @@ private fun SettingsTab(
             Text("Notification icon", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
             Text("Choose how the icon appears in the status bar", style = MaterialTheme.typography.labelSmall, color = Gray500)
             Spacer(Modifier.height(8.dp))
-            listOf("shield" to "Shield", "circle_count" to "Circle with count").forEach { (value, label) ->
-                Row(Modifier.fillMaxWidth().clickable { onIconStyleChange(value) }.padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text(label, style = MaterialTheme.typography.bodySmall, color = EmeraldDark)
-                    Spacer(Modifier.weight(1f))
-                    if (notificationIconStyle == value) Text("✓", color = Emerald, fontWeight = FontWeight.Bold)
+
+            Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("shield") }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = notificationIconStyle == "shield", onClick = { onIconStyleChange("shield") })
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = Emerald)
+                Spacer(Modifier.width(12.dp))
+                Column { Text("Shield", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
+                    Text("Status bar shows the SB shield icon", style = MaterialTheme.typography.labelSmall, color = Gray500) }
+            }
+            Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("circle_count") }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = notificationIconStyle == "circle_count", onClick = { onIconStyleChange("circle_count") })
+                Spacer(Modifier.width(4.dp))
+                Box(Modifier.size(20.dp).background(Emerald, CircleShape), contentAlignment = Alignment.Center) {
+                    Text("N", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White, fontSize = 9.sp))
                 }
+                Spacer(Modifier.width(12.dp))
+                Column { Text("Circle with count", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
+                    Text("Status bar shows a circle with today's blocked count", style = MaterialTheme.typography.labelSmall, color = Gray500) }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -561,8 +579,9 @@ private fun SettingsTab(
             listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark").forEach { (mode, label) ->
                 Row(Modifier.fillMaxWidth().clickable { onThemeChange(mode) }.padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text(label, style = MaterialTheme.typography.bodySmall, color = EmeraldDark, modifier = Modifier.weight(1f))
-                    if (themeMode == mode) Text("✓", color = Emerald, fontWeight = FontWeight.Bold)
+                    RadioButton(selected = themeMode == mode, onClick = { onThemeChange(mode) })
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, style = MaterialTheme.typography.bodySmall, color = EmeraldDark)
                 }
             }
 
