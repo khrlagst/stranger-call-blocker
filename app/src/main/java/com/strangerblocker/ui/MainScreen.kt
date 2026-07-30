@@ -425,29 +425,31 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                 } else {
                     Spacer(Modifier.height(16.dp))
                     val maxCount = groupedCalls.maxOf { it.calls.size }.coerceAtLeast(1)
-                    val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
-                    Row(
-                        Modifier.fillMaxWidth().height(140.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.Bottom,
-                    ) {
-                        groupedCalls.forEachIndexed { idx, group ->
-                            val barHeight = (group.calls.size.toFloat() / maxCount * 100f).toInt().coerceAtLeast(4)
-                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("${group.calls.size}",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.weight(1f))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(barHeight.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(if (group.header == "Today") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(dayLabels.getOrElse(idx) { group.header.take(3) },
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                    val cal = java.util.Calendar.getInstance()
+                    val todayDayIndex = cal.get(java.util.Calendar.DAY_OF_WEEK)
+                    val dayAbbr = listOf("", "S", "M", "T", "W", "T", "F", "S")
+                    groupedCalls.forEachIndexed { idx, group ->
+                        val barHeight = (group.calls.size.toFloat() / maxCount * 100f).toInt().coerceAtLeast(4)
+                        val dayLabel = when (idx) {
+                            0 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY + 7) % 7; dayAbbr[java.util.Calendar.SUNDAY + d] }
+                            1 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY - 1 + 7) % 7; dayAbbr[java.util.Calendar.SUNDAY + d] }
+                            2 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY - 2 + 7) % 7; dayAbbr[Calendar.SUNDAY + d] }
+                            else -> group.header.take(3)
+                        }
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${group.calls.size}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.weight(1f))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(barHeight.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (group.header == "Today") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(dayLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -488,7 +490,7 @@ private fun CallsContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
-                    Text("Block strangers",
+                    Text("Block stranger calls",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary)
                     Text(if (isBlockingEnabled) "Unknown numbers are silently rejected" else "All calls ring through",
@@ -794,16 +796,6 @@ private fun AboutScreen(
                 }
             }
             Spacer(Modifier.height(16.dp))
-                    Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Update to v${updateInfo.latestVersion}", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                        if (updateDownloading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        else Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
 
