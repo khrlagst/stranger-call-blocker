@@ -71,18 +71,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Delete existing release for this tag to allow re-runs
+          gh release delete "${GITHUB_REF_NAME}" --yes 2>/dev/null || true
           if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
             # Preview tags (e.g. v1.9.5-p01) → mark as pre-release
             gh release create "${GITHUB_REF_NAME}" \
               app/build/outputs/apk/release/*.apk \
               --title "${GITHUB_REF_NAME}" \
               --generate-notes \
-              --prerelease \
-              --overwrite
+              --prerelease
           else
             gh release create "${GITHUB_REF_NAME}" \
               app/build/outputs/apk/release/*.apk \
               --title "${GITHUB_REF_NAME}" \
-              --generate-notes \
-              --overwrite
+              --generate-notes
           fi
