@@ -64,8 +64,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -316,6 +316,7 @@ private fun HomeScreen(
                 )
             }
 
+            val scope = rememberCoroutineScope()
             TabBar(
                 pagerState = pagerState,
                 selectedTab = selectedTab,
@@ -323,6 +324,7 @@ private fun HomeScreen(
                 blockedCount = totalBlocked,
                 onSelectTab = { tab ->
                     onSelectTab(tab)
+                    scope.launch { pagerState.animateScrollToPage(tab.ordinal) }
                 },
             )
             Spacer(Modifier.height(12.dp))
@@ -725,12 +727,7 @@ private fun TabBar(
     BoxWithConstraints {
         val tabWidth = maxWidth / 2
         val slideProgress = pagerState.currentPage + pagerState.currentPageOffsetFraction
-        val indicatorTarget: androidx.compose.ui.unit.Dp = tabWidth * slideProgress
-        val indicatorOffset by animateDpAsState(
-            targetValue = indicatorTarget,
-            animationSpec = tween(280),
-            label = "tabSlide",
-        )
+        val indicatorOffset = tabWidth * slideProgress
 
         Surface(
             shape = RoundedCornerShape(22.dp),
@@ -1045,8 +1042,8 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 
 private fun latestChangelog(): List<String> {
     return listOf(
-        "Sliding pill indicator synced with pager state",
-        "Pager state persists across screen navigation (no tab reset)",
-        "Smooth animation between tabs via animateDpAsState",
+        "Tab tap now animates pager (indicator follows immediately)",
+        "Swipe indicator tracks finger without animation lag",
+        "Removed animateDpAsState wrapper — raw pager state drives position",
     )
 }
