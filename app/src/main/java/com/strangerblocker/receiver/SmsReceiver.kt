@@ -24,7 +24,7 @@ class SmsReceiver : BroadcastReceiver() {
         if (!prefs.getBoolean("sms_blocking_enabled", true)) return
 
         val messages: List<SmsMessage> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            Telephony.Sms.Intents.getMessagesFromIntent(intent)
+            Telephony.Sms.Intents.getMessagesFromIntent(intent).toList()
         } else {
             @Suppress("DEPRECATION")
             val pdus = intent.extras?.get("pdus") as? Array<*> ?: return
