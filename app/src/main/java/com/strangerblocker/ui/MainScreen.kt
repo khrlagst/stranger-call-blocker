@@ -429,28 +429,30 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                     val cal = java.util.Calendar.getInstance()
                     val todayDayIndex = cal.get(java.util.Calendar.DAY_OF_WEEK)
                     val dayAbbr = listOf("", "S", "M", "T", "W", "T", "F", "S")
-                    groupedCalls.forEachIndexed { idx, group ->
-                        val barHeight = (group.calls.size.toFloat() / maxCount * 100f).toInt().coerceAtLeast(4)
-                        val dayLabel = when (idx) {
-                            0 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY + 7) % 7; dayAbbr[java.util.Calendar.SUNDAY + d] }
-                            1 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY - 1 + 7) % 7; dayAbbr[java.util.Calendar.SUNDAY + d] }
-                            2 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY - 2 + 7) % 7; dayAbbr[Calendar.SUNDAY + d] }
-                            else -> group.header.take(3)
-                        }
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${group.calls.size}",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.weight(1f))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(barHeight.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (group.header == "Today") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(dayLabel,
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        groupedCalls.forEachIndexed { idx, group ->
+                            val barHeight = (group.calls.size.toFloat() / maxCount * 100f).toInt().coerceAtLeast(4)
+                            val dayLabel = when (idx) {
+                                0 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY + 7) % 7; dayAbbr[java.util.Calendar.SUNDAY + d] }
+                                1 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY - 1 + 7) % 7; dayAbbr[java.util.Calendar.SUNDAY + d] }
+                                2 -> { val d = (todayDayIndex - java.util.Calendar.SUNDAY - 2 + 7) % 7; dayAbbr[java.util.Calendar.SUNDAY + d] }
+                                else -> group.header.take(3)
+                            }
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("${group.calls.size}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.weight(1f))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(barHeight.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(if (group.header == "Today") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(dayLabel,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -486,26 +488,12 @@ private fun CallsContent(
     }
 
     Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 100.dp)) {
-            Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(Modifier.weight(1f)) {
-                    Text("Block stranger calls",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary)
-                    Text(if (isBlockingEnabled) "Unknown numbers are silently rejected" else "All calls ring through",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(
-                    checked = isBlockingEnabled,
-                    onCheckedChange = onToggleBlocking,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                    ),
-                )
-            }
+            ToggleRow(
+                title = "Block stranger calls",
+                subtitle = if (isBlockingEnabled) "Unknown numbers are silently rejected" else "All calls ring through",
+                checked = isBlockingEnabled,
+                onToggle = onToggleBlocking,
+            )
 
             TabBar(
                 pagerState = pagerState,
@@ -561,20 +549,12 @@ private fun SmsScreen(
     onRemoveWhitelist: (WhitelistedNumber) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 100.dp)) {
-        Spacer(Modifier.height(4.dp))
-        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.weight(1f)) {
-                Text("Block stranger SMS",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary)
-                Text(if (smsBlockingEnabled) "Messages from unknown numbers are silently blocked"
-                     else "All SMS messages ring through",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(checked = smsBlockingEnabled, onCheckedChange = onToggleSmsBlocking,
-                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
-        }
+        ToggleRow(
+            title = "Block stranger SMS",
+            subtitle = if (smsBlockingEnabled) "Messages from unknown numbers are silently blocked" else "All SMS messages ring through",
+            checked = smsBlockingEnabled,
+            onToggle = onToggleSmsBlocking,
+        )
 
         Card(
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -733,6 +713,32 @@ private fun SettingsTab(
             }
             Spacer(Modifier.height(80.dp))
         }
+    }
+}
+
+// ── Shared toggle row for Calls & SMS tabs ──
+
+@Composable
+private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
+    Spacer(Modifier.height(4.dp))
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween) {
+        Column(Modifier.weight(1f)) {
+            Text(title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary)
+            Text(subtitle,
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+            ),
+        )
     }
 }
 

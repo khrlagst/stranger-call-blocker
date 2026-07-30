@@ -341,7 +341,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun checkForUpdates() {
         if (_checkingForUpdates.value) return
         _checkingForUpdates.value = true
-        _updateInfo.value = null
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val ctx = getApplication<Application>()
