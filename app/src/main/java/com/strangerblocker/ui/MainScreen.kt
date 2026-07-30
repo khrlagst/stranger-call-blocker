@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -62,10 +63,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateDpAsState
 import androidx.compose.animation.core.tween
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -129,9 +128,17 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         } catch (_: Exception) { "?" }
     }
 
+    val pagerState = rememberPagerState(pageCount = { 2 })
+
+    LaunchedEffect(pagerState.currentPage) {
+        val newTab = Tab.entries[pagerState.currentPage]
+        if (newTab != selectedTab) viewModel.selectTab(newTab)
+    }
+
     Box(Modifier.fillMaxSize()) {
         when (currentScreen) {
             Screen.HOME -> HomeScreen(
+                pagerState = pagerState,
                 isBlockingEnabled = isBlockingEnabled,
                 isRoleHeld = isRoleHeld,
                 groupedCalls = groupedCalls,
@@ -210,6 +217,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeScreen(
+    pagerState: androidx.compose.foundation.pager.PagerState,
     isBlockingEnabled: Boolean,
     isRoleHeld: Boolean,
     groupedCalls: List<CallGroup>,
@@ -307,24 +315,16 @@ private fun HomeScreen(
                 )
             }
 
-            val pagerState = rememberPagerState(pageCount = { 2 })
-            val scope = rememberCoroutineScope()
-
             TabBar(
+                pagerState = pagerState,
                 selectedTab = selectedTab,
                 whitelistCount = whitelisted.size,
                 blockedCount = totalBlocked,
                 onSelectTab = { tab ->
                     onSelectTab(tab)
-                    scope.launch { pagerState.animateScrollToPage(tab.ordinal) }
                 },
             )
             Spacer(Modifier.height(12.dp))
-
-            LaunchedEffect(pagerState.currentPage) {
-                val newTab = Tab.entries[pagerState.currentPage]
-                if (newTab != selectedTab) onSelectTab(newTab)
-            }
 
             Card(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -715,21 +715,45 @@ private fun AboutScreen(
 
 @Composable
 private fun TabBar(
+    pagerState: androidx.compose.foundation.pager.PagerState,
     selectedTab: Tab,
     whitelistCount: Int,
     blockedCount: Int,
     onSelectTab: (Tab) -> Unit,
 ) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(modifier = Modifier.padding(3.dp)) {
-            TabItem("Whitelist", whitelistCount, selectedTab == Tab.WHITELIST,
-                { onSelectTab(Tab.WHITELIST) }, Modifier.weight(1f))
-            TabItem("Blocked", blockedCount, selectedTab == Tab.BLOCKED,
-                { onSelectTab(Tab.BLOCKED) }, Modifier.weight(1f))
+    BoxWithConstraints {
+        val tabWidth = maxWidth / 2
+        val slideProgress = pagerState.currentPage + pagerState.currentPageOffsetFraction
+        val indicatorOffset by animateDpAsState(
+            targetValue = tabWidth * slideProgress,
+            animationSpec = tween(280),
+            label = "tabSlide",
+        )
+
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Box(Modifier.fillMaxWidth()) {
+                // Sliding indicator pill
+                Box(
+                    modifier = Modifier
+                        .offset(x = indicatorOffset + 3.dp)
+                        .width(tabWidth - 6.dp)
+                        .padding(vertical = 3.dp)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Emerald),
+                )
+                // Clickable tabs
+                Row(Modifier.fillMaxWidth().padding(3.dp)) {
+                    TabItem("Whitelist", whitelistCount, selectedTab == Tab.WHITELIST,
+                        { onSelectTab(Tab.WHITELIST) }, Modifier.weight(1f))
+                    TabItem("Blocked", blockedCount, selectedTab == Tab.BLOCKED,
+                        { onSelectTab(Tab.BLOCKED) }, Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -739,57 +763,32 @@ private fun TabItem(
     label: String, count: Int, selected: Boolean,
     onClick: () -> Unit, modifier: Modifier = Modifier,
 ) {
-    val bgColor by animateColorAsState(
-        targetValue = if (selected) Emerald else Color.Transparent,
-        animationSpec = tween(250),
-        label = "tabBg",
-    )
-    val textColor by animateColorAsState(
-        targetValue = if (selected) Color.White else Gray500,
-        animationSpec = tween(250),
-        label = "tabText",
-    )
-    val badgeBg by animateColorAsState(
-        targetValue = if (selected) Color.White.copy(alpha = 0.25f) else Gray300.copy(alpha = 0.4f),
-        animationSpec = tween(250),
-        label = "tabBadgeBg",
-    )
-    val badgeTextColor by animateColorAsState(
-        targetValue = if (selected) Color.White else Gray500,
-        animationSpec = tween(250),
-        label = "tabBadgeText",
-    )
-
-    Box(
+    Row(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(bgColor, RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        contentAlignment = Alignment.Center,
+            .height(36.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 16.dp),
+        Text(label,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
+            color = if (selected) Color.White else Gray500)
+        Spacer(Modifier.width(5.dp))
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(
+                    if (selected) Color.White.copy(alpha = 0.25f)
+                    else Gray300.copy(alpha = 0.4f)
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(label,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
-                color = textColor)
-            Spacer(Modifier.width(5.dp))
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(badgeBg, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("$count",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                    color = badgeTextColor)
-            }
+            Text("$count",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                color = if (selected) Color.White else Gray500)
         }
     }
 }
@@ -1044,8 +1043,8 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 
 private fun latestChangelog(): List<String> {
     return listOf(
-        "Icon translateY 30, transparent status bar for light theme",
-        "Badge ripple clipped to pill shape",
-        "Animated tab pill transitions on swipe",
+        "Sliding pill indicator synced with pager state",
+        "Pager state persists across screen navigation (no tab reset)",
+        "Smooth animation between tabs via animateDpAsState",
     )
 }
