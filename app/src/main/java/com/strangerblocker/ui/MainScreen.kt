@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -63,7 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.animation.animateDpAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -724,8 +725,9 @@ private fun TabBar(
     BoxWithConstraints {
         val tabWidth = maxWidth / 2
         val slideProgress = pagerState.currentPage + pagerState.currentPageOffsetFraction
+        val indicatorTarget: androidx.compose.ui.unit.Dp = tabWidth * slideProgress
         val indicatorOffset by animateDpAsState(
-            targetValue = tabWidth * slideProgress,
+            targetValue = indicatorTarget,
             animationSpec = tween(280),
             label = "tabSlide",
         )
