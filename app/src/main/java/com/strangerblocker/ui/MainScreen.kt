@@ -197,7 +197,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         groupedBlockedSms = groupedBlockedSms,
                         totalSmsBlocked = totalSmsBlocked,
                         whitelisted = whitelisted,
-                        onRemoveWhitelist = onRemoveWhitelist,
+                        onRemoveWhitelist = { viewModel.removeFromWhitelist(it.phoneNumber) },
                     )
                     BottomNavTab.SETTINGS -> SettingsTab(
                         notificationsEnabled = notificationsEnabled,

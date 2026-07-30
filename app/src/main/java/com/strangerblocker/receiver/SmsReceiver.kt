@@ -3,7 +3,6 @@ package com.strangerblocker.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsMessage
@@ -24,22 +23,21 @@ class SmsReceiver : BroadcastReceiver() {
         val prefs = context.getSharedPreferences("stranger_blocker", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("sms_blocking_enabled", true)) return
 
-        val messages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        val messages: List<SmsMessage> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             Telephony.Sms.Intents.getMessagesFromIntent(intent)
         } else {
             @Suppress("DEPRECATION")
-            intent.extras?.get("pdus")?.let { pdus ->
-                (pdus as Array<*>).map { pdu ->
-                    SmsMessage.createFromPdu(pdu as ByteArray)
-                }
-            } ?: return
+            val pdus = intent.extras?.get("pdus") as? Array<*> ?: return
+            pdus.mapNotNull { pdu ->
+                @Suppress("DEPRECATION")
+                SmsMessage.createFromPdu(pdu as? ByteArray ?: return@mapNotNull null)
+            }
         }
 
-        if (messages.isEmpty()) return
-        val sender = messages[0].originatingAddress ?: return
-        val body = messages.map { it.messageBody }.joinToString("")
+        val firstMsg = messages.firstOrNull() ?: return
+        val sender = firstMsg.originatingAddress ?: return
+        val body = messages.joinToString("") { it.messageBody ?: "" }
 
-        // Check whitelist
         val db = (context.applicationContext as StrangerBlockerApp).db
         scope.launch {
             val isWhitelisted = try {
