@@ -150,7 +150,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     }
 
     // ── Main layout with bottom nav ──
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxSize()) {
             // Shared header (title + badge across all tabs)
             Row(
@@ -168,7 +168,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             HorizontalDivider(thickness = 1.dp)
 
             // Tab content
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            Surface(Modifier.weight(1f).fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
                 when (bottomNavTab) {
                     BottomNavTab.DASHBOARD -> DashboardScreen(
                         totalBlocked = totalBlocked,
