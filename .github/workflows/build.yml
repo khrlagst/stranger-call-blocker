@@ -71,7 +71,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            app/build/outputs/apk/release/*.apk \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            # Preview tags (e.g. v1.9.5-p01) → mark as pre-release
+            gh release create "${GITHUB_REF_NAME}" \
+              app/build/outputs/apk/release/*.apk \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --prerelease
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              app/build/outputs/apk/release/*.apk \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes
+          fi
