@@ -303,13 +303,13 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                 Text("$todayCount",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
                 Spacer(Modifier.height(4.dp))
-                Text("$thisWeekCount calls this week · $totalBlocked all time",
+                Text("Calls: $todayCount · SMS: 0",
                     style = MaterialTheme.typography.bodySmall, color = Gray500)
             }
         }
         Spacer(Modifier.height(12.dp))
 
-        // Calls This Week + All Time side by side
+        // Calls This Week + SMS This Week side by side
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Card(
                 modifier = Modifier.weight(1f),
@@ -323,6 +323,8 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                     Spacer(Modifier.height(4.dp))
                     Text("$thisWeekCount",
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                    Text("from $totalBlocked total",
+                        style = MaterialTheme.typography.labelSmall, color = Gray500)
                 }
             }
             Card(
@@ -332,10 +334,45 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("All Time",
+                    Text("SMS This Week",
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                    Spacer(Modifier.height(4.dp))
+                    Text("0",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                    Text("from 0 total",
+                        style = MaterialTheme.typography.labelSmall, color = Gray500)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        // All Time — Calls + All Time — SMS
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("All Time — Calls",
                         style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
                     Spacer(Modifier.height(4.dp))
                     Text("$totalBlocked",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                }
+            }
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("All Time — SMS",
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                    Spacer(Modifier.height(4.dp))
+                    Text("0",
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
                 }
             }
@@ -353,19 +390,35 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                 Text("Weekly Activity",
                     style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
 
+                // Legend
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Emerald))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Calls", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Gray500)
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF6EE7B7)))
+                    Spacer(Modifier.width(4.dp))
+                    Text("SMS", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Gray500)
+                }
+
                 if (groupedCalls.isEmpty()) {
                     Spacer(Modifier.height(16.dp))
                     Text("No data yet", style = MaterialTheme.typography.bodySmall, color = Gray500.copy(alpha = 0.6f))
                 } else {
                     Spacer(Modifier.height(16.dp))
                     val maxCount = groupedCalls.maxOf { it.calls.size }.coerceAtLeast(1)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        groupedCalls.forEach { group ->
-                            val barHeight = (group.calls.size.toFloat() / maxCount * 120f).toInt().coerceAtLeast(4)
+                    val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
+                    Row(
+                        Modifier.fillMaxWidth().height(140.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        groupedCalls.forEachIndexed { idx, group ->
+                            val barHeight = (group.calls.size.toFloat() / maxCount * 100f).toInt().coerceAtLeast(4)
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("${group.calls.size}",
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = Gray500)
-                                Spacer(Modifier.height(4.dp))
+                                Spacer(Modifier.weight(1f))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -374,7 +427,7 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                                         .background(if (group.header == "Today") Emerald else Emerald.copy(alpha = 0.5f)),
                                 )
                                 Spacer(Modifier.height(4.dp))
-                                Text(group.header.take(3),
+                                Text(dayLabels.getOrElse(idx) { group.header.take(3) },
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = Gray500)
                             }
                         }
@@ -432,7 +485,7 @@ private fun CallsScreen(
         HorizontalDivider(thickness = 1.dp)
         Spacer(Modifier.height(8.dp))
 
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 80.dp)) {
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -493,7 +546,6 @@ private fun CallsScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(80.dp))
         }
     }
 }
