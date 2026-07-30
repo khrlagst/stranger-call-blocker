@@ -301,7 +301,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val currentVer = ctx.packageManager
                     .getPackageInfo(ctx.packageName, 0)
                     .versionName ?: "0.0.0"
-                val info = UpdateChecker.check() ?: return@launch
+                val info = UpdateChecker.check(currentVer) ?: return@launch
                 if (info.isNewerThan(currentVer) && info.latestVersion != currentVer) {
                     _updateInfo.value = info
                 }

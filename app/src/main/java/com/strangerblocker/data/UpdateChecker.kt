@@ -1,5 +1,6 @@
 package com.strangerblocker.data
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -25,36 +26,71 @@ data class UpdateInfo(
 
 object UpdateChecker {
 
-    private const val API_URL =
+    private const val API_LATEST =
         "https://api.github.com/repos/khrlagst/stranger-call-blocker/releases/latest"
+    private const val API_LIST =
+        "https://api.github.com/repos/khrlagst/stranger-call-blocker/releases"
 
     /**
-     * Fetch the latest release from GitHub. Returns null on failure
-     * (network error, rate limit, or no release yet).
+     * Fetch the latest applicable release. If [currentVersion] contains `-p`
+     * (preview), searches all releases including pre-releases so preview
+     * builds can update to newer previews. Otherwise fetches only the latest
+     * stable release.
      */
-    fun check(): UpdateInfo? {
-        return try {
-            val response = URL(API_URL).openConnection().let { conn ->
-                conn as HttpURLConnection
-                conn.connectTimeout = 10_000
-                conn.readTimeout = 10_000
-                conn.inputStream.bufferedReader().readText()
-            }
-            val json = JSONObject(response)
-            val tag = json.getString("tag_name")          // "v1.1.0"
-            val notes = json.optString("body", "")
-            val assets = json.getJSONArray("assets")
-            val url = if (assets.length() > 0) {
-                assets.getJSONObject(0).getString("browser_download_url")
-            } else return null
+    fun check(currentVersion: String = ""): UpdateInfo? {
+        val isPreview = currentVersion.contains("-p")
+        return if (isPreview) checkFromList(currentVersion) else checkLatest()
+    }
 
-            UpdateInfo(
-                latestVersion = tag.removePrefix("v"),
-                downloadUrl = url,
-                releaseNotes = notes,
-            )
+    private fun checkLatest(): UpdateInfo? {
+        return try {
+            val response = fetch(API_LATEST)
+            val json = JSONObject(response)
+            parseRelease(json)
         } catch (_: Exception) {
             null
+        }
+    }
+
+    private fun checkFromList(currentVersion: String): UpdateInfo? {
+        return try {
+            val response = fetch(API_LIST)
+            val array = JSONArray(response)
+            for (i in 0 until array.length()) {
+                val release = array.getJSONObject(i)
+                val info = parseRelease(release) ?: continue
+                if (info.isNewerThan(currentVersion) && info.latestVersion != currentVersion) {
+                    return info
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun parseRelease(json: JSONObject): UpdateInfo? {
+        val tag = json.optString("tag_name", "") ?: return null
+        if (tag.isEmpty()) return null
+        val version = tag.removePrefix("v")
+        val assets = json.optJSONArray("assets")
+        val url = if (assets != null && assets.length() > 0) {
+            assets.getJSONObject(0).optString("browser_download_url", "")
+        } else ""
+        if (url.isEmpty()) return null
+        return UpdateInfo(
+            latestVersion = version,
+            downloadUrl = url,
+            releaseNotes = json.optString("body", ""),
+        )
+    }
+
+    private fun fetch(url: String): String {
+        return URL(url).openConnection().let { conn ->
+            conn as HttpURLConnection
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 10_000
+            conn.inputStream.bufferedReader().readText()
         }
     }
 
