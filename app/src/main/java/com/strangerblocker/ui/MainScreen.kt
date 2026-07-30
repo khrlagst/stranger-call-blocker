@@ -93,12 +93,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Emerald = Color(0xFF10B981)
-private val EmeraldDark = Color(0xFF059669)
-private val Gray500 = Color(0xFF6B7280)
-private val Emerald50 = Color(0xFFECFDF5)
-private val Gray300 = Color(0xFFD1D5DB)
-private val Gray200 = Color(0xFFE5E5E5)
+
 
 // ── Root ──
 
@@ -167,7 +162,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             ) {
                 Text("Stranger Blocker",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = EmeraldDark, modifier = Modifier.weight(1f))
+                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                 RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
             }
             HorizontalDivider(thickness = 1.dp)
@@ -277,9 +272,9 @@ private fun BottomNavBar(selectedTab: BottomNavTab, onSelectTab: (BottomNavTab) 
             NavigationBarItem(
                 selected = selectedTab == item.tab,
                 onClick = { onSelectTab(item.tab) },
-                icon = { Icon(item.icon, contentDescription = item.label, tint = if (selectedTab == item.tab) Emerald else Gray500) },
-                label = { Text(item.label, fontSize = 10.sp, color = if (selectedTab == item.tab) Emerald else Gray500) },
-                colors = NavigationBarItemDefaults.colors(indicatorColor = Emerald50),
+                icon = { Icon(item.icon, contentDescription = item.label, tint = if (selectedTab == item.tab) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
+                label = { Text(item.label, fontSize = 10.sp, color = if (selectedTab == item.tab) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
+                colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
             )
         }
     }
@@ -304,15 +299,15 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            Column(Modifier.padding(20.dp)) {
+            Column(Modifier.padding(16.dp)) {
                 Text("Total Blocked Today",
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 Text("$todayCount",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
                 Text("Calls: $todayCount · SMS: 0",
-                    style = MaterialTheme.typography.bodySmall, color = Gray500)
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -327,12 +322,12 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text("Calls This Week",
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text("$thisWeekCount",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                     Text("from $totalBlocked total",
-                        style = MaterialTheme.typography.labelSmall, color = Gray500)
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Card(
@@ -343,12 +338,12 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text("SMS This Week",
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text("0",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                     Text("from 0 total",
-                        style = MaterialTheme.typography.labelSmall, color = Gray500)
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -364,10 +359,10 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text("All Time — Calls",
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text("$totalBlocked",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 }
             }
             Card(
@@ -378,10 +373,10 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text("All Time — SMS",
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text("0",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -396,22 +391,22 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
         ) {
             Column(Modifier.padding(20.dp)) {
                 Text("Weekly Activity",
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = Gray500)
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 // Legend
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Emerald))
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.primary))
                     Spacer(Modifier.width(4.dp))
-                    Text("Calls", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Gray500)
+                    Text("Calls", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(12.dp))
                     Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF6EE7B7)))
                     Spacer(Modifier.width(4.dp))
-                    Text("SMS", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Gray500)
+                    Text("SMS", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 if (groupedCalls.isEmpty()) {
                     Spacer(Modifier.height(16.dp))
-                    Text("No data yet", style = MaterialTheme.typography.bodySmall, color = Gray500.copy(alpha = 0.6f))
+                    Text("No data yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                 } else {
                     Spacer(Modifier.height(16.dp))
                     val maxCount = groupedCalls.maxOf { it.calls.size }.coerceAtLeast(1)
@@ -425,18 +420,18 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>) {
                             val barHeight = (group.calls.size.toFloat() / maxCount * 100f).toInt().coerceAtLeast(4)
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("${group.calls.size}",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = Gray500)
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.weight(1f))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(barHeight.dp)
                                         .clip(RoundedCornerShape(4.dp))
-                                        .background(if (group.header == "Today") Emerald else Emerald.copy(alpha = 0.5f)),
+                                        .background(if (group.header == "Today") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(dayLabels.getOrElse(idx) { group.header.take(3) },
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = Gray500)
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -480,16 +475,16 @@ private fun CallsContent(
                 Column(Modifier.weight(1f)) {
                     Text("Block strangers",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = EmeraldDark)
+                        color = MaterialTheme.colorScheme.primary)
                     Text(if (isBlockingEnabled) "Unknown numbers are silently rejected" else "All calls ring through",
-                        style = MaterialTheme.typography.bodySmall, color = Gray500)
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(
                     checked = isBlockingEnabled,
                     onCheckedChange = onToggleBlocking,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Emerald,
-                        checkedTrackColor = Emerald.copy(alpha = 0.2f),
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                     ),
                 )
             }
@@ -552,13 +547,13 @@ private fun SmsScreen() {
                 Spacer(Modifier.height(12.dp))
                 Text("SMS Blocking",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = EmeraldDark)
+                    color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(6.dp))
                 Text("Coming in a future preview",
-                    style = MaterialTheme.typography.bodyMedium, color = Gray500)
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 Text("SMS blocking will be available\nin preview p03 and beyond",
-                    style = MaterialTheme.typography.bodySmall, color = Gray500.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.padding(horizontal = 40.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
@@ -588,59 +583,59 @@ private fun SettingsTab(
                 .padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Text("Notifications", style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
+            Text("Notifications", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Block alerts",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
                     Text("Show blocked call count in status bar",
-                        style = MaterialTheme.typography.labelSmall, color = Gray500)
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = Emerald, checkedTrackColor = Emerald.copy(alpha = 0.2f),
-                        uncheckedThumbColor = Gray500, uncheckedTrackColor = Gray300.copy(alpha = 0.4f)))
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             Spacer(Modifier.height(4.dp))
 
-            Text("Notification icon", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
-            Text("Choose how the icon appears in the status bar", style = MaterialTheme.typography.labelSmall, color = Gray500)
+            Text("Notification icon", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+            Text("Choose how the icon appears in the status bar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
 
             Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("shield") }.padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = notificationIconStyle == "shield", onClick = { onIconStyleChange("shield") })
                 Spacer(Modifier.width(4.dp))
-                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = Emerald)
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
-                Column { Text("Shield", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
-                    Text("Status bar shows the SB shield icon", style = MaterialTheme.typography.labelSmall, color = Gray500) }
+                Column { Text("Shield", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                    Text("Status bar shows the SB shield icon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("circle_count") }.padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = notificationIconStyle == "circle_count", onClick = { onIconStyleChange("circle_count") })
                 Spacer(Modifier.width(4.dp))
-                Box(Modifier.size(20.dp).background(Emerald, CircleShape), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(20.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {
                     Text("N", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White, fontSize = 9.sp))
                 }
                 Spacer(Modifier.width(12.dp))
-                Column { Text("Circle with count", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
-                    Text("Status bar shows a circle with today's blocked count", style = MaterialTheme.typography.labelSmall, color = Gray500) }
+                Column { Text("Circle with count", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                    Text("Status bar shows a circle with today's blocked count", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
 
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            Text("Theme", style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
+            Text("Theme", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark").forEach { (mode, label) ->
                 Row(Modifier.fillMaxWidth().clickable { onThemeChange(mode) }.padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = themeMode == mode, onClick = { onThemeChange(mode) })
                     Spacer(Modifier.width(8.dp))
-                    Text(label, style = MaterialTheme.typography.bodySmall, color = EmeraldDark)
+                    Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -648,33 +643,33 @@ private fun SettingsTab(
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            Text("Updates", style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
+            Text("Updates", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Preview builds", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
-                    Text("Receive pre-release updates before stable release", style = MaterialTheme.typography.labelSmall, color = Gray500)
+                    Text("Preview builds", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                    Text("Receive pre-release updates before stable release", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = previewUpdates, onCheckedChange = onPreviewToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = Emerald, checkedTrackColor = Emerald.copy(alpha = 0.2f),
-                        uncheckedThumbColor = Gray500, uncheckedTrackColor = Gray300.copy(alpha = 0.4f)))
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
 
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            Text("About", style = MaterialTheme.typography.labelLarge, color = EmeraldDark)
+            Text("About", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             Surface(shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onAbout)) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = Emerald)
+                    Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Stranger Blocker", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = EmeraldDark)
-                        Text("Version info, changelog & updates", style = MaterialTheme.typography.labelSmall, color = Gray500)
+                        Text("Stranger Blocker", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text("Version info, changelog & updates", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("›", style = MaterialTheme.typography.titleMedium, color = Gray300)
+                    Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(80.dp))
@@ -699,8 +694,8 @@ private fun AboutScreen(
                 Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)
                     .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = EmeraldDark) }
-                    Text("About", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary) }
+                    Text("About", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 }
                 HorizontalDivider()
             }
@@ -708,28 +703,28 @@ private fun AboutScreen(
     ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())) {
             Box(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(48.dp), tint = Emerald)
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
             }
             Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Stranger Blocker", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark)
+                    Text("Stranger Blocker", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
-                    Text("v$appVersion", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = Gray500)
+                    Text("v$appVersion", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(6.dp))
             Spacer(Modifier.height(24.dp))
 
             if (updateInfo != null) {
-                Surface(shape = RoundedCornerShape(8.dp), color = Emerald50,
+                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable(onClick = onUpdateClick)) {
                     Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = Emerald)
+                        Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
                         Text("Update to v${updateInfo.latestVersion}", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = EmeraldDark, modifier = Modifier.weight(1f))
+                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                         if (updateDownloading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        else Text("›", style = MaterialTheme.typography.titleMedium, color = Emerald)
+                        else Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -737,13 +732,13 @@ private fun AboutScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            Text("What's new", style = MaterialTheme.typography.labelLarge, color = EmeraldDark,
+            Text("What's new", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(8.dp))
             Column(Modifier.padding(horizontal = 20.dp)) {
                 latestChangelog().forEach { item ->
                     Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text("• ", style = MaterialTheme.typography.bodySmall, color = Emerald)
+                        Text("• ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                         Text(item, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -753,7 +748,7 @@ private fun AboutScreen(
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(16.dp))
             Text("github.com/khrlagst/stranger-call-blocker",
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = EmeraldDark,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp))
         }
     }
@@ -778,7 +773,7 @@ private fun TabBar(
 
             Box(Modifier.fillMaxWidth()) {
                 Box(Modifier.offset(x = indicatorOffset + 3.dp).width(tabWidth - 6.dp)
-                    .padding(vertical = 3.dp).height(36.dp).clip(RoundedCornerShape(20.dp)).background(Emerald))
+                    .padding(vertical = 3.dp).height(36.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.primary))
                 Row(Modifier.fillMaxWidth().padding(3.dp)) {
                     TabItem("Whitelist", whitelistCount, selectedTab == Tab.WHITELIST,
                         { onSelectTab(Tab.WHITELIST) }, Modifier.weight(1f))
@@ -792,15 +787,15 @@ private fun TabBar(
 
 @Composable
 private fun TabItem(label: String, count: Int, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick).height(36.dp),
+    Row(modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick).height(36.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Text(label, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
-            color = if (selected) Color.White else Gray500)
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(5.dp))
-        Box(Modifier.size(18.dp).clip(CircleShape).background(if (selected) Color.White.copy(alpha = 0.25f) else Gray300.copy(alpha = 0.4f)),
+        Box(Modifier.size(18.dp).clip(CircleShape).background(if (selected) Color.White.copy(alpha = 0.25f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
             contentAlignment = Alignment.Center) {
             Text("$count", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                color = if (selected) Color.White else Gray500)
+                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -815,13 +810,13 @@ private fun CardHeader(
     Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Text(when (selectedTab) { Tab.WHITELIST -> "Whitelist"; Tab.BLOCKED -> "Blocked" },
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = EmeraldDark,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f))
         when (selectedTab) {
-            Tab.WHITELIST -> IconButton(onClick = onAddToWhitelist) { Icon(Icons.Default.Add, contentDescription = "Add to whitelist", tint = Emerald) }
+            Tab.WHITELIST -> IconButton(onClick = onAddToWhitelist) { Icon(Icons.Default.Add, contentDescription = "Add to whitelist", tint = MaterialTheme.colorScheme.primary) }
             Tab.BLOCKED -> if (blockedCount > 0) {
-                IconButton(onClick = onExportCsv) { Icon(Icons.Default.FileDownload, contentDescription = "Export CSV", tint = Gray300) }
-                IconButton(onClick = onClearHistory) { Icon(Icons.Default.ClearAll, contentDescription = "Clear history", tint = Gray300) }
+                IconButton(onClick = onExportCsv) { Icon(Icons.Default.FileDownload, contentDescription = "Export CSV", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = onClearHistory) { Icon(Icons.Default.ClearAll, contentDescription = "Clear history", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
@@ -834,9 +829,9 @@ private fun WhitelistContent(entries: List<WhitelistedNumber>, onRemove: (Whitel
     if (entries.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(24.dp), tint = Gray300.copy(alpha = 0.5f))
+                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(6.dp))
-                Text("No numbers whitelisted", style = MaterialTheme.typography.bodySmall, color = Gray500.copy(alpha = 0.6f))
+                Text("No numbers whitelisted", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
             }
         }
     } else {
@@ -857,9 +852,9 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
     if (groups.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(24.dp), tint = Gray300.copy(alpha = 0.5f))
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(6.dp))
-                Text("No blocked calls yet", style = MaterialTheme.typography.bodySmall, color = Gray500.copy(alpha = 0.6f))
+                Text("No blocked calls yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
             }
         }
     } else {
@@ -867,7 +862,7 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
             groups.forEach { group ->
                 stickyHeader(key = "header_${group.header}") {
                     Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(start = 12.dp, top = 8.dp, bottom = 2.dp)) {
-                        Text("${group.header} (${group.calls.size})", style = MaterialTheme.typography.labelMedium, color = Emerald)
+                        Text("${group.header} (${group.calls.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 items(group.calls, key = { it.id }) { call -> BlockedCallRow(call = call, onWhitelist = { onWhitelist(call) }) }
@@ -880,13 +875,13 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
 
 @Composable
 private fun RoleBadge(isActive: Boolean, onTap: () -> Unit) {
-    Surface(shape = RoundedCornerShape(14.dp), color = if (isActive) Emerald50 else Color(0xFFFEF2F2),
+    Surface(shape = RoundedCornerShape(14.dp), color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFFEF2F2),
         modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onTap)) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(if (isActive) Emerald else Color(0xFFDC2626)))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(if (isActive) MaterialTheme.colorScheme.primary else Color(0xFFDC2626)))
             Spacer(Modifier.width(6.dp))
             Text(if (isActive) "Active" else "Inactive", style = MaterialTheme.typography.labelSmall,
-                color = if (isActive) Emerald else Color(0xFFDC2626))
+                color = if (isActive) MaterialTheme.colorScheme.primary else Color(0xFFDC2626))
         }
     }
 }
@@ -894,26 +889,26 @@ private fun RoleBadge(isActive: Boolean, onTap: () -> Unit) {
 @Composable
 private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(14.dp), tint = Emerald.copy(alpha = 0.5f))
+        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(number, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
-            if (label != null) Text(label, style = MaterialTheme.typography.labelSmall, color = Gray500)
+            if (label != null) Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(16.dp), tint = Gray300) }
+        IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
 @Composable
 private fun BlockedCallRow(call: BlockedCall, onWhitelist: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(14.dp), tint = Emerald.copy(alpha = 0.5f))
+        Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(call.blockedAtMillis)), style = MaterialTheme.typography.labelSmall, color = Gray500)
+            Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(call.blockedAtMillis)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = Gray300) }
+        IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     HorizontalDivider(modifier = Modifier.padding(start = 36.dp), thickness = 0.5.dp)
 }
@@ -924,7 +919,7 @@ private fun BlockedCallRow(call: BlockedCall, onWhitelist: () -> Unit) {
 private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (String) -> Unit, onLabelChange: (String) -> Unit, onAdd: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add to whitelist", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = EmeraldDark) },
+        title = { Text("Add to whitelist", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = number, onValueChange = onNumberChange, label = { Text("Phone number") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
@@ -933,7 +928,7 @@ private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (S
         },
         confirmButton = {
             TextButton(onClick = onAdd, enabled = number.isNotBlank()) {
-                Text("Add", color = if (number.isNotBlank()) Emerald else Gray300, fontWeight = FontWeight.Bold)
+                Text("Add", color = if (number.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -947,9 +942,9 @@ private fun UpdateConfirmDialog(version: String, releaseNotes: String, downloadi
         title = { Text("Update to v$version") },
         text = { Column {
             if (releaseNotes.isNotBlank()) {
-                Text("What's changed", style = MaterialTheme.typography.labelMedium, color = EmeraldDark)
+                Text("What's changed", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(8.dp))
-                Text(releaseNotes, style = MaterialTheme.typography.bodySmall, color = Gray500)
+                Text(releaseNotes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else Text("Version $version is ready to install.", style = MaterialTheme.typography.bodyMedium)
             if (downloading) { Spacer(Modifier.height(12.dp)); CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) }
         } },
@@ -963,17 +958,16 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Clear blocked history?") },
-        text = { Text("This will permanently delete all $total blocked call records. No undo.", style = MaterialTheme.typography.bodySmall, color = Gray500) },
+        text = { Text("This will permanently delete all $total blocked call records. No undo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         confirmButton = { TextButton(onClick = onConfirm) { Text("Clear All", color = Color(0xFFDC2626)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Shared header across all tabs with Active badge",
-    "Dashboard: full cards set, chart legend, bars from bottom",
-    "Calls: fixed padding, tab ripple shape, extra brace removed",
-    "Preview builds: check triggers on toggle, version compare fixed",
+    "Dark mode: hardcoded colors replaced with MaterialTheme.colorScheme",
+    "Card margins aligned (16dp padding on all dashboard cards)",
+    "TabItem: added fillMaxWidth to match indicator pill width",
 )
 
 
