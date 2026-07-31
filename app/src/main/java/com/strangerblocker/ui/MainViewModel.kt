@@ -180,6 +180,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ── Whitelist removal confirm ──
+
+    private val _pendingWhitelistRemoval = MutableStateFlow<WhitelistedNumber?>(null)
+    val pendingWhitelistRemoval: StateFlow<WhitelistedNumber?> = _pendingWhitelistRemoval.asStateFlow()
+
+    fun requestRemoveWhitelist(entry: WhitelistedNumber) {
+        _pendingWhitelistRemoval.value = entry
+    }
+
+    fun confirmRemoveWhitelist() {
+        _pendingWhitelistRemoval.value?.let { removeFromWhitelist(it.phoneNumber) }
+        _pendingWhitelistRemoval.value = null
+    }
+
+    fun cancelRemoveWhitelist() {
+        _pendingWhitelistRemoval.value = null
+    }
+
     // ── SMS blocking ──
 
     private val _smsBlockingEnabled = MutableStateFlow(
@@ -525,6 +543,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmClearHistory() {
         viewModelScope.launch { db.blockedCallDao().clearAll() }
         showClearHistoryDialog.value = false
+    }
+
+    fun deleteBlockedByIds(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch { db.blockedCallDao().deleteByIds(ids) }
     }
 
     private fun maybePostNotification() {

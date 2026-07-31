@@ -20,6 +20,10 @@ interface BlockedCallDao {
     @Query("DELETE FROM blocked_calls")
     suspend fun clearAll()
 
+    /** Delete specific records by id (batch delete). */
+    @Query("DELETE FROM blocked_calls WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     /** Purge entries older than [cutoff] millis (e.g. 30 days). */
     @Query("DELETE FROM blocked_calls WHERE blockedAtMillis < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long)

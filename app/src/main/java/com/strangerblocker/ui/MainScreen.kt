@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,6 +73,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -138,6 +140,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val pendingUpdate by viewModel.pendingUpdate.collectAsState()
     val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
     val showAddWhitelistDialog by viewModel.showAddWhitelistDialog.collectAsState()
+    val pendingWhitelistRemoval by viewModel.pendingWhitelistRemoval.collectAsState()
     val whitelistInputNumber by viewModel.whitelistInputNumber.collectAsState()
     val whitelistInputLabel by viewModel.whitelistInputLabel.collectAsState()
     val context = LocalContext.current
@@ -232,8 +235,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
                         onExportCsv = { saveCsvLauncher.launch("blocked_calls.csv") },
                         onClearHistory = viewModel::openClearHistoryDialog,
-                        onRemoveWhitelist = { viewModel.removeFromWhitelist(it.phoneNumber) },
+                        onRemoveWhitelist = viewModel::requestRemoveWhitelist,
                         onWhitelistCall = { viewModel.addToWhitelist(it.phoneNumber, null) },
+                        onDeleteBlocked = viewModel::deleteBlockedByIds,
                     )
                     BottomNavTab.SMS -> SmsScreen(
                         smsBlockingEnabled = smsBlockingEnabled,
@@ -244,7 +248,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         selectedTab = selectedTab,
                         onSelectTab = viewModel::selectTab,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
-                        onRemoveWhitelist = { viewModel.removeFromWhitelist(it.phoneNumber) },
+                        onRemoveWhitelist = viewModel::requestRemoveWhitelist,
                         onWhitelistSms = { viewModel.addToWhitelist(it.senderNumber, null) },
                     )
                     BottomNavTab.SETTINGS -> SettingsTab(
@@ -310,6 +314,16 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             onLabelChange = { viewModel.whitelistInputLabel.value = it },
             onAdd = viewModel::confirmAddWhitelist,
             onDismiss = viewModel::closeAddWhitelistDialog,
+        )
+    }
+    if (pendingWhitelistRemoval != null) {
+        val entry = pendingWhitelistRemoval!!
+        AlertDialog(
+            onDismissRequest = viewModel::cancelRemoveWhitelist,
+            title = { Text("Remove from whitelist?") },
+            text = { Text("${entry.phoneNumber} will no longer be allowed through.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            confirmButton = { TextButton(onClick = viewModel::confirmRemoveWhitelist) { Text("Remove", color = Color(0xFFDC2626)) } },
+            dismissButton = { TextButton(onClick = viewModel::cancelRemoveWhitelist) { Text("Cancel") } },
         )
     }
 }
@@ -581,6 +595,7 @@ private fun CallsContent(
     onClearHistory: () -> Unit,
     onRemoveWhitelist: (WhitelistedNumber) -> Unit,
     onWhitelistCall: (BlockedCall) -> Unit,
+    onDeleteBlocked: (List<Long>) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -642,7 +657,7 @@ private fun CallsContent(
                         ) { page ->
                             when (page) {
                                 0 -> WhitelistContent(entries = if (searchQuery.isBlank()) whitelisted else filteredWhitelisted, onRemove = onRemoveWhitelist)
-                                1 -> BlockedContent(groups = if (searchQuery.isBlank()) groupedCalls else filteredGroupedCalls, onWhitelist = onWhitelistCall)
+                                1 -> BlockedContent(groups = if (searchQuery.isBlank()) groupedCalls else filteredGroupedCalls, onWhitelist = onWhitelistCall, onDelete = onDeleteBlocked)
                             }
                         }
                     }
@@ -1108,14 +1123,12 @@ private fun CardHeader(
 ) {
     Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(when (selectedTab) { Tab.WHITELIST -> "Whitelist"; Tab.BLOCKED -> "Blocked" },
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f))
+        Spacer(Modifier.weight(1f))
         when (selectedTab) {
             Tab.WHITELIST -> IconButton(onClick = onAddToWhitelist) { Icon(Icons.Default.Add, contentDescription = "Add to whitelist", tint = MaterialTheme.colorScheme.primary) }
             Tab.BLOCKED -> if (blockedCount > 0) {
-                IconButton(onClick = onExportCsv) { Icon(Icons.Default.FileDownload, contentDescription = "Export CSV", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick = onClearHistory) { Icon(Icons.Default.ClearAll, contentDescription = "Clear history", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = onExportCsv) { Icon(Icons.Default.FileDownload, contentDescription = "Export blocked calls", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = onClearHistory) { Icon(Icons.Default.ClearAll, contentDescription = "Clear blocked history", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
@@ -1147,10 +1160,12 @@ private fun WhitelistContent(entries: List<WhitelistedNumber>, onRemove: (Whitel
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -> Unit) {
+private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -> Unit, onDelete: (List<Long>) -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var selectedCall by remember { mutableStateOf<BlockedCall?>(null) }
+    var selectionMode by remember { mutableStateOf(false) }
+    val selectedIds = remember { mutableStateSetOf<Long>() }
     val sheetState = rememberModalBottomSheetState()
 
     if (groups.isEmpty()) {
@@ -1173,15 +1188,44 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
                 val byNumber = group.calls.groupBy { it.phoneNumber }
                 byNumber.forEach { (_, calls) ->
                     val first = calls.first()
+                    val isSelected = selectedIds.contains(first.id)
                     item(key = "num_${first.id}") {
                         BlockedCallRow(
                             call = first,
                             frequency = calls.size,
+                            isSelected = isSelected,
                             onWhitelist = { onWhitelist(first) },
-                            onTap = { selectedCall = first },
+                            onTap = {
+                                if (selectionMode) {
+                                    if (isSelected) selectedIds.remove(first.id) else selectedIds.add(first.id)
+                                } else {
+                                    selectedCall = first
+                                }
+                            },
+                            onLongPress = {
+                                selectionMode = true
+                                selectedIds.add(first.id)
+                            },
                         )
                     }
                 }
+            }
+        }
+    }
+
+    // Batch delete bar
+    if (selectionMode) {
+        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.fillMaxWidth().padding(12.dp).clickable {
+                onDelete(selectedIds.toList())
+                selectedIds.clear()
+                selectionMode = false
+            }) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+                Spacer(Modifier.width(8.dp))
+                Text("Delete ${selectedIds.size} blocked", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                if (selectedIds.isNotEmpty()) Text("Done", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
     }
@@ -1266,9 +1310,17 @@ private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
 }
 
 @Composable
-private fun BlockedCallRow(call: BlockedCall, frequency: Int, onWhitelist: () -> Unit, onTap: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onTap).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolean, onWhitelist: () -> Unit, onTap: () -> Unit, onLongPress: () -> Unit) {
+    Row(Modifier.fillMaxWidth()
+        .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+        .padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (isSelected) {
+            Icon(Icons.Default.PersonAdd, contentDescription = "Selected", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(6.dp))
+        } else {
+            Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+            Spacer(Modifier.width(10.dp))
+        }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1373,9 +1425,9 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Recent Activity list on dashboard — who was blocked and when",
-    "Quick whitelist straight from recent activity",
-    "Weekly chart shows the actual date range",
+    "Batch select blocked numbers (long-press) and delete in bulk",
+    "Whitelist removal now asks for confirmation",
+    "Removed duplicate header label in the calls card",
 )
 
 
