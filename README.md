@@ -166,6 +166,16 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.9.5-p25** | Calls search bar, frequency badge (×N), tap action menu |
+| **1.9.5-p24** | RoleBadge data class fix (p23 build fix) |
+| **1.9.5-p23** | Pause/resume blocking, paused badge countdown, chart legend |
+| **1.9.5-p22** | UpdateCheckResult import fix (p21 build fix) |
+| **1.9.5-p21** | BlockedSms import fix (p20 build fix) |
+| **1.9.5-p20** | Dual-channel updates (stable + preview), SMS runtime permission |
+| **1.9.5-p19** | About update button opens overlay, changelog refresh |
+| **1.9.5-p18** | SMS listener category check (SystemApi avoidance) |
+| **1.9.5-p17** | SMS listener compile fixes |
+| **1.9.5-p16** | Sync abortBroadcast, SMS notification listener for Android 11+ |
 | **1.9.5-p15** | 7-day chart, SMS tab layout, About banner dark theme |
 | **1.9.5-p12** | Chart day labels fix, consistent header names, zombie code cleanup |
 | **1.9.5-p11** | Manual check-for-updates button, checking state, Play Protect docs |

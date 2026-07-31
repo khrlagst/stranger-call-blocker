@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.stateIn
@@ -126,6 +127,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val selectedTab = MutableStateFlow(Tab.WHITELIST)
 
     fun selectTab(tab: Tab) { selectedTab.value = tab }
+
+    // ── Search ──
+
+    val searchQuery = MutableStateFlow("")
+
+    fun setSearchQuery(query: String) { searchQuery.value = query }
+
+    /** Blocked calls filtered by [searchQuery] (matches phone number substring). */
+    val filteredGroupedCalls: StateFlow<List<CallGroup>> = combine(groupedCalls, searchQuery) { groups, query ->
+        if (query.isBlank()) groups
+        else groups.mapNotNull { group ->
+            val matched = group.calls.filter { it.phoneNumber.contains(query, ignoreCase = true) }
+            if (matched.isEmpty()) null else CallGroup(group.header, matched)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Whitelist filtered by [searchQuery] (matches number or label substring). */
+    val filteredWhitelisted: StateFlow<List<WhitelistedNumber>> = combine(whitelisted, searchQuery) { list, query ->
+        if (query.isBlank()) list
+        else list.filter {
+            it.phoneNumber.contains(query, ignoreCase = true) ||
+                (it.label?.contains(query, ignoreCase = true) == true)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ── Whitelist ──
 

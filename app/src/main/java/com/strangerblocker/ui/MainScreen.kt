@@ -57,9 +57,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -69,15 +71,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -111,6 +117,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val groupedCalls by viewModel.groupedCalls.collectAsState()
     val totalBlocked by viewModel.totalBlocked.collectAsState()
     val whitelisted by viewModel.whitelisted.collectAsState(initial = emptyList())
+    val filteredGroupedCalls by viewModel.filteredGroupedCalls.collectAsState()
+    val filteredWhitelisted by viewModel.filteredWhitelisted.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
     val updateCheckResult by viewModel.updateCheckResult.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
@@ -208,11 +217,15 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     BottomNavTab.CALLS -> CallsContent(
                         isBlockingEnabled = isBlockingEnabled,
                         groupedCalls = groupedCalls,
+                        filteredGroupedCalls = filteredGroupedCalls,
+                        filteredWhitelisted = filteredWhitelisted,
+                        searchQuery = searchQuery,
                         totalBlocked = totalBlocked,
                         whitelisted = whitelisted,
                         selectedTab = selectedTab,
                         onToggleBlocking = viewModel::toggleBlocking,
                         onSelectTab = viewModel::selectTab,
+                        onSearchChange = viewModel::setSearchQuery,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
                         onExportCsv = { saveCsvLauncher.launch("blocked_calls.csv") },
                         onClearHistory = viewModel::openClearHistoryDialog,
@@ -521,11 +534,15 @@ private fun DashboardScreen(
 private fun CallsContent(
     isBlockingEnabled: Boolean,
     groupedCalls: List<CallGroup>,
+    filteredGroupedCalls: List<CallGroup>,
+    filteredWhitelisted: List<WhitelistedNumber>,
+    searchQuery: String,
     totalBlocked: Int,
     whitelisted: List<WhitelistedNumber>,
     selectedTab: Tab,
     onToggleBlocking: (Boolean) -> Unit,
     onSelectTab: (Tab) -> Unit,
+    onSearchChange: (String) -> Unit,
     onAddToWhitelist: () -> Unit,
     onExportCsv: () -> Unit,
     onClearHistory: () -> Unit,
@@ -547,6 +564,17 @@ private fun CallsContent(
                 checked = isBlockingEnabled,
                 onToggle = onToggleBlocking,
             )
+
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = { Text("Search number or label") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
 
             TabBar(
                 pagerState = pagerState,
@@ -580,8 +608,8 @@ private fun CallsContent(
                             modifier = Modifier.fillMaxSize(),
                         ) { page ->
                             when (page) {
-                                0 -> WhitelistContent(entries = whitelisted, onRemove = onRemoveWhitelist)
-                                1 -> BlockedContent(groups = groupedCalls, onWhitelist = onWhitelistCall)
+                                0 -> WhitelistContent(entries = if (searchQuery.isBlank()) whitelisted else filteredWhitelisted, onRemove = onRemoveWhitelist)
+                                1 -> BlockedContent(groups = if (searchQuery.isBlank()) groupedCalls else filteredGroupedCalls, onWhitelist = onWhitelistCall)
                             }
                         }
                     }
@@ -1066,7 +1094,14 @@ private fun WhitelistContent(entries: List<WhitelistedNumber>, onRemove: (Whitel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -> Unit) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var selectedCall by remember { mutableStateOf<BlockedCall?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+
     if (groups.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1083,7 +1118,63 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
                         Text("${group.header} (${group.calls.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                items(group.calls, key = { it.id }) { call -> BlockedCallRow(call = call, onWhitelist = { onWhitelist(call) }) }
+                // Group identical numbers to show call-frequency badge
+                val byNumber = group.calls.groupBy { it.phoneNumber }
+                byNumber.forEach { (_, calls) ->
+                    val first = calls.first()
+                    item(key = "num_${first.id}") {
+                        BlockedCallRow(
+                            call = first,
+                            frequency = calls.size,
+                            onWhitelist = { onWhitelist(first) },
+                            onTap = { selectedCall = first },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (selectedCall != null) {
+        val call = selectedCall!!
+        ModalBottomSheet(onDismissRequest = { selectedCall = null }, sheetState = sheetState) {
+            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+                Text(call.phoneNumber, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(4.dp))
+                Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(call.blockedAtMillis)),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(16.dp))
+                // Whitelist
+                Row(Modifier.fillMaxWidth().clickable {
+                    onWhitelist(call); selectedCall = null
+                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Whitelist number", style = MaterialTheme.typography.bodyMedium)
+                }
+                // Copy number
+                Row(Modifier.fillMaxWidth().clickable {
+                    clipboard.setText(AnnotatedString(call.phoneNumber)); selectedCall = null
+                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Copy number", style = MaterialTheme.typography.bodyMedium)
+                }
+                // Call back
+                Row(Modifier.fillMaxWidth().clickable {
+                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${call.phoneNumber}")))
+                    selectedCall = null
+                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Call back", style = MaterialTheme.typography.bodyMedium)
+                }
+                // Report spam (stub for now — future keyword/number classification)
+                Row(Modifier.fillMaxWidth().clickable { selectedCall = null }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Report as spam", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -1124,12 +1215,21 @@ private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
 }
 
 @Composable
-private fun BlockedCallRow(call: BlockedCall, onWhitelist: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun BlockedCallRow(call: BlockedCall, frequency: Int, onWhitelist: () -> Unit, onTap: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onTap).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (frequency > 1) {
+                    Spacer(Modifier.width(6.dp))
+                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
+                        Text("×$frequency", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                    }
+                }
+            }
             Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(call.blockedAtMillis)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -1200,10 +1300,9 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Pause blocking for 1 hour from the dashboard",
-    "Paused badge with countdown — tap to resume",
-    "Call blocker respects pause state",
-    "Weekly chart legend (Calls vs SMS)",
+    "Search bar filters whitelist and blocked lists live",
+    "Call frequency badge — repeated spam numbers show ×N count",
+    "Tap a blocked number for actions: whitelist, copy, call back, report",
 )
 
 
