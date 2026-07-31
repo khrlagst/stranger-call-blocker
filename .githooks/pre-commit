@@ -100,15 +100,12 @@ $IMPORT_OK && pass "All imports are correct"
 echo ""
 echo "── 5. Version check ──"
 VERSION_OK=true
-CURRENT_TAG=$(git tag --points-at HEAD 2>/dev/null | head -1)
 BUILD_VERSION=$(grep 'versionName' "app/build.gradle.kts" | sed 's/.*"\(.*\)".*/\1/')
-# Preview tags get -pNN suffix: version should match
-if [ -n "$CURRENT_TAG" ]; then
-    TAG_VERSION=$(echo "$CURRENT_TAG" | sed 's/^v//')
-    if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
-        fail "Tag v$TAG_VERSION != build.gradle.kts version \"$BUILD_VERSION\""
-        VERSION_OK=false
-    fi
+# Check the version is not a DUPLICATE of an existing tag (means bump was forgotten)
+# We check all tags, not just HEAD's, so a version-bump commit isn't falsely blocked.
+LAST_TAG=$(git tag --sort=-v:refname 2>/dev/null | head -1 | sed 's/^v//')
+if [ -n "$LAST_TAG" ] && [ "$LAST_TAG" = "$BUILD_VERSION" ]; then
+    warn "Version $BUILD_VERSION already has a tag — did you forget to bump?"
 fi
 
 # versionCode should be an integer

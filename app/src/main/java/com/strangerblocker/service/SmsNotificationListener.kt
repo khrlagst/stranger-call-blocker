@@ -2,6 +2,7 @@ package com.strangerblocker.service
 
 import android.app.Notification
 import android.content.Context
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.strangerblocker.StrangerBlockerApp
@@ -46,13 +47,12 @@ class SmsNotificationListener : NotificationListenerService() {
     }
 
     private fun isSmsNotification(notif: Notification): Boolean {
-        val style = notif.style
-        if (style is Notification.MessagingStyle) return true
+        if (notif.getStyle() is Notification.MessagingStyle) return true
         return notif.category == Notification.CATEGORY_MESSAGE
     }
 
     private fun extractSender(notif: Notification): String? {
-        val style = notif.style
+        val style = notif.getStyle()
         if (style is Notification.MessagingStyle) {
             val messages = style.messages
             if (messages.isNotEmpty()) {
@@ -60,13 +60,11 @@ class SmsNotificationListener : NotificationListenerService() {
                 if (sender != null && sender.isNotBlank()) return sender
             }
         }
-        // Fallback: some apps put sender in extras
         val textLines = notif.extras.getStringArray(Notification.EXTRA_TEXT_LINES)
         if (textLines != null && textLines.isNotEmpty()) {
             return textLines.firstOrNull()?.split(":")?.firstOrNull()?.trim()
         }
-        val title = notif.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-        return title?.trim()
+        return notif.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
     }
 
     private fun isContact(number: String): Boolean {
