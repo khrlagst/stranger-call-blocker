@@ -57,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -130,6 +131,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val smsBlockingEnabled by viewModel.smsBlockingEnabled.collectAsState()
     val smsKeywords by viewModel.smsKeywords.collectAsState()
+    val manualBlocks by viewModel.manualBlocks.collectAsState()
     val groupedBlockedSms by viewModel.groupedBlockedSms.collectAsState()
     val totalSmsBlocked by viewModel.totalSmsBlocked.collectAsState()
     val notificationIconStyle by viewModel.notificationIconStyle.collectAsState()
@@ -149,6 +151,21 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         ActivityResultContracts.CreateDocument("text/csv"),
     ) { uri: Uri? ->
         if (uri != null) viewModel.exportCsvToUri(uri)
+    }
+
+    val pickContactLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickContact(),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val number = context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null, null, null
+            )?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+            if (number != null) viewModel.whitelistInputNumber.value = number
+        }
     }
 
     val appVersion = remember {
@@ -216,9 +233,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         weeklyCounts = weeklyCounts,
                         recentBlocked = recentBlocked,
                         pauseUntil = pauseUntil,
+                        manualBlocks = manualBlocks,
                         onPauseOneHour = { viewModel.pauseBlocking(60) },
                         onResumeBlocking = viewModel::resumeBlocking,
                         onQuickWhitelist = { viewModel.addToWhitelist(it.phoneNumber, null) },
+                        onAddManualBlock = viewModel::addManualBlock,
                     )
                     BottomNavTab.CALLS -> CallsContent(
                         isBlockingEnabled = isBlockingEnabled,
@@ -317,6 +336,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             onLabelChange = { viewModel.whitelistInputLabel.value = it },
             onAdd = viewModel::confirmAddWhitelist,
             onDismiss = viewModel::closeAddWhitelistDialog,
+            onPickContact = { pickContactLauncher.launch(null) },
+            onPickRecent = {
+                recentBlocked.firstOrNull()?.let { viewModel.whitelistInputNumber.value = it.phoneNumber }
+            },
         )
     }
     if (pendingWhitelistRemoval != null) {
@@ -369,9 +392,11 @@ private fun DashboardScreen(
     weeklyCounts: List<Int>,
     recentBlocked: List<BlockedCall>,
     pauseUntil: Long,
+    manualBlocks: Set<String>,
     onPauseOneHour: () -> Unit,
     onResumeBlocking: () -> Unit,
     onQuickWhitelist: (BlockedCall) -> Unit,
+    onAddManualBlock: (String) -> Unit,
 ) {
     val todayCount = groupedCalls.firstOrNull()?.calls?.size ?: 0
     val thisWeekCount = groupedCalls.takeWhile { it.header != "Earlier" }.sumOf { it.calls.size }
@@ -419,6 +444,35 @@ private fun DashboardScreen(
                     Text("Pause blocking for 1 hour", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                     Text("Pause", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        // Manual block bar
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Manual Block", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                var manualInput by remember { mutableStateOf("") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = manualInput, onValueChange = { manualInput = it },
+                        placeholder = { Text("Enter number to block") }, singleLine = true, shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        onAddManualBlock(manualInput)
+                        manualInput = ""
+                    }, enabled = manualInput.isNotBlank()) { Text("Block", color = MaterialTheme.colorScheme.primary) }
+                }
+                if (manualBlocks.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("${manualBlocks.size} manually blocked", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -1380,7 +1434,7 @@ private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolea
 // ── Dialogs ──
 
 @Composable
-private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (String) -> Unit, onLabelChange: (String) -> Unit, onAdd: () -> Unit, onDismiss: () -> Unit) {
+private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (String) -> Unit, onLabelChange: (String) -> Unit, onAdd: () -> Unit, onDismiss: () -> Unit, onPickContact: () -> Unit, onPickRecent: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add to whitelist", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary) },
@@ -1388,6 +1442,14 @@ private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (S
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = number, onValueChange = onNumberChange, label = { Text("Phone number") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = label, onValueChange = onLabelChange, label = { Text("Label (optional)") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onPickContact, shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)) {
+                        Text("From contacts", fontSize = 12.sp)
+                    }
+                    OutlinedButton(onClick = onPickRecent, shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)) {
+                        Text("From recent", fontSize = 12.sp)
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1462,9 +1524,9 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Block SMS by keyword — add words like Pinjaman, Hadiah, Judol",
-    "Blocked SMS show whether sender or keyword triggered the block",
-    "Alpha sender IDs (like TELKOMSEL) can be whitelisted",
+    "Manual block bar — block any number for calls and SMS",
+    "Add to whitelist from contacts or recent blocked",
+    "Manual blocks override the contact check",
 )
 
 

@@ -166,6 +166,7 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.9.5-p31** | Manual block bar (calls + SMS), whitelist from contacts/recent |
 | **1.9.5-p30** | SMS keyword blocking, block-reason labels, alpha sender whitelist, batch-select fix |
 | **1.9.5-p29** | Batch select + bulk delete, whitelist removal confirm, header de-dup |
 | **1.9.5-p28** | Dashboard recency — recent activity, quick whitelist, chart date range |

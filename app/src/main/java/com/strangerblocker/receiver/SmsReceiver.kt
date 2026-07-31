@@ -52,6 +52,7 @@ class SmsReceiver : BroadcastReceiver() {
             false
         }
 
+        val isManuallyBlocked = prefs.getStringSet("manual_blocks", emptySet())?.contains(sender) == true
         val keywords = prefs.getStringSet("sms_keywords", emptySet())?.toList() ?: emptyList()
         val matchedKeyword = keywords.firstOrNull { body.contains(it, ignoreCase = true) }
         val reason = when {
@@ -59,7 +60,7 @@ class SmsReceiver : BroadcastReceiver() {
             else -> "SENDER"
         }
 
-        if ((!isWhitelisted && !isContact(context, sender)) || matchedKeyword != null) {
+        if (isManuallyBlocked || (!isWhitelisted && !isContact(context, sender)) || matchedKeyword != null) {
             // Abort the broadcast NOW — synchronously inside onReceive().
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                 abortBroadcast()

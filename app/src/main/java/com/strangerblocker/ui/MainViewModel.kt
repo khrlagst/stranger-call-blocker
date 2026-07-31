@@ -276,6 +276,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isBlockingEnabled.value = enabled
     }
 
+    // ── Manual block list ──
+
+    private val _manualBlocks = MutableStateFlow(
+        prefs.getStringSet("manual_blocks", emptySet()) ?: emptySet()
+    )
+    val manualBlocks: StateFlow<Set<String>> = _manualBlocks.asStateFlow()
+
+    fun addManualBlock(number: String) {
+        val trimmed = number.trim()
+        if (trimmed.isBlank()) return
+        val updated = _manualBlocks.value + trimmed
+        prefs.edit().putStringSet("manual_blocks", updated).apply()
+        _manualBlocks.value = updated
+    }
+
+    fun removeManualBlock(number: String) {
+        val updated = _manualBlocks.value - number
+        prefs.edit().putStringSet("manual_blocks", updated).apply()
+        _manualBlocks.value = updated
+    }
+
     // ── Pause blocking (temporary) ──
 
     private val _pauseUntil = MutableStateFlow(prefs.getLong("blocking_paused_until", 0L))

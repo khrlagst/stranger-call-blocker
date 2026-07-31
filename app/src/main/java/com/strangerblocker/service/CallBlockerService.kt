@@ -60,6 +60,30 @@ class CallBlockerService : CallScreeningService() {
             return
         }
 
+        // Manual block overrides contacts — user explicitly blocked this number
+        if (isManuallyBlocked(phoneNumber)) {
+            respondToCall(
+                details,
+                CallScreeningService.CallResponse.Builder()
+                    .setDisallowCall(true)
+                    .setRejectCall(true)
+                    .setSkipCallLog(false)
+                    .setSkipNotification(false)
+                    .build(),
+            )
+            scope.launch {
+                val app = applicationContext as StrangerBlockerApp
+                app.db.blockedCallDao().insert(
+                    BlockedCall(
+                        phoneNumber = phoneNumber,
+                        blockedAtMillis = System.currentTimeMillis(),
+                    )
+                )
+                postBlockedNotification(app)
+            }
+            return
+        }
+
         val isContact = isNumberInContacts(phoneNumber)
 
         if (isContact) {
@@ -98,6 +122,11 @@ class CallBlockerService : CallScreeningService() {
     private fun isPaused(): Boolean {
         val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
         return prefs.getLong("blocking_paused_until", 0L) > System.currentTimeMillis()
+    }
+
+    private fun isManuallyBlocked(number: String): Boolean {
+        val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
+        return prefs.getStringSet("manual_blocks", emptySet())?.contains(number) == true
     }
 
     private fun isNotificationsEnabled(): Boolean {
