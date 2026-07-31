@@ -73,7 +73,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -130,6 +129,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val checkingForUpdates by viewModel.checkingForUpdates.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val smsBlockingEnabled by viewModel.smsBlockingEnabled.collectAsState()
+    val smsKeywords by viewModel.smsKeywords.collectAsState()
     val groupedBlockedSms by viewModel.groupedBlockedSms.collectAsState()
     val totalSmsBlocked by viewModel.totalSmsBlocked.collectAsState()
     val notificationIconStyle by viewModel.notificationIconStyle.collectAsState()
@@ -259,6 +259,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         smsBlockingEnabled = smsBlockingEnabled,
                         onSmsToggle = viewModel::toggleSmsBlocking,
                         smsPermissionGranted = smsPermissionGranted,
+                        smsKeywords = smsKeywords,
+                        onAddSmsKeyword = viewModel::addSmsKeyword,
+                        onRemoveSmsKeyword = viewModel::removeSmsKeyword,
                         themeMode = themeMode,
                         onThemeChange = viewModel::setThemeMode,
                         previewUpdates = previewUpdates,
@@ -777,7 +780,15 @@ private fun BlockedSmsRow(sms: BlockedSms, onWhitelist: () -> Unit) {
             Text(sms.senderNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(sms.messageBody, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(sms.blockedAtMillis)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(sms.blockedAtMillis)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (sms.blockReason.startsWith("KEYWORD")) {
+                    Spacer(Modifier.width(6.dp))
+                    Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
+                        Text("keyword", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp))
+                    }
+                }
+            }
         }
         IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
@@ -795,6 +806,9 @@ private fun SettingsTab(
     smsBlockingEnabled: Boolean,
     onSmsToggle: (Boolean) -> Unit,
     smsPermissionGranted: Boolean,
+    smsKeywords: List<String>,
+    onAddSmsKeyword: (String) -> Unit,
+    onRemoveSmsKeyword: (String) -> Unit,
     themeMode: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
     previewUpdates: Boolean,
@@ -871,6 +885,28 @@ private fun SettingsTab(
                 Switch(checked = smsBlockingEnabled, onCheckedChange = onSmsToggle,
                     colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                         uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+            }
+            // Keyword filtering
+            Text("Block by keyword", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+            Text("Block SMS containing these words (e.g. Pinjaman, Hadiah, Judol)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            var keywordInput by remember { mutableStateOf("") }
+            OutlinedTextField(value = keywordInput, onValueChange = { keywordInput = it },
+                placeholder = { Text("Add keyword") }, singleLine = true, shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = {
+                    onAddSmsKeyword(keywordInput)
+                    keywordInput = ""
+                }, enabled = keywordInput.isNotBlank()) { Text("Add keyword", color = MaterialTheme.colorScheme.primary) }
+            }
+            smsKeywords.forEach { kw ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(kw, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { onRemoveSmsKeyword(kw) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Remove keyword", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -1165,7 +1201,7 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
     val clipboard = LocalClipboardManager.current
     var selectedCall by remember { mutableStateOf<BlockedCall?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
-    val selectedIds = remember { mutableStateSetOf<Long>() }
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val sheetState = rememberModalBottomSheetState()
 
     if (groups.isEmpty()) {
@@ -1197,14 +1233,14 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
                             onWhitelist = { onWhitelist(first) },
                             onTap = {
                                 if (selectionMode) {
-                                    if (isSelected) selectedIds.remove(first.id) else selectedIds.add(first.id)
+                                    selectedIds = if (isSelected) selectedIds - first.id else selectedIds + first.id
                                 } else {
                                     selectedCall = first
                                 }
                             },
                             onLongPress = {
                                 selectionMode = true
-                                selectedIds.add(first.id)
+                                selectedIds = selectedIds + first.id
                             },
                         )
                     }
@@ -1218,7 +1254,7 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
         Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer,
             modifier = Modifier.fillMaxWidth().padding(12.dp).clickable {
                 onDelete(selectedIds.toList())
-                selectedIds.clear()
+                selectedIds = emptySet()
                 selectionMode = false
             }) {
             Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1309,6 +1345,7 @@ private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolean, onWhitelist: () -> Unit, onTap: () -> Unit, onLongPress: () -> Unit) {
     Row(Modifier.fillMaxWidth()
@@ -1425,9 +1462,9 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Batch select blocked numbers (long-press) and delete in bulk",
-    "Whitelist removal now asks for confirmation",
-    "Removed duplicate header label in the calls card",
+    "Block SMS by keyword — add words like Pinjaman, Hadiah, Judol",
+    "Blocked SMS show whether sender or keyword triggered the block",
+    "Alpha sender IDs (like TELKOMSEL) can be whitelisted",
 )
 
 

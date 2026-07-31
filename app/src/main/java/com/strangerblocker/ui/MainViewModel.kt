@@ -231,6 +231,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _smsBlockingEnabled.value = enabled
     }
 
+    // ── SMS keyword filtering ──
+
+    private val _smsKeywords = MutableStateFlow(
+        prefs.getStringSet("sms_keywords", emptySet())?.toList() ?: emptyList()
+    )
+    val smsKeywords: StateFlow<List<String>> = _smsKeywords.asStateFlow()
+
+    fun addSmsKeyword(keyword: String) {
+        val trimmed = keyword.trim()
+        if (trimmed.isBlank()) return
+        val updated = (_smsKeywords.value + trimmed).distinct()
+        prefs.edit().putStringSet("sms_keywords", updated.toSet()).apply()
+        _smsKeywords.value = updated
+    }
+
+    fun removeSmsKeyword(keyword: String) {
+        val updated = _smsKeywords.value - keyword
+        prefs.edit().putStringSet("sms_keywords", updated.toSet()).apply()
+        _smsKeywords.value = updated
+    }
+
     // ── Toggle ──
 
     private val _isBlockingEnabled = MutableStateFlow(

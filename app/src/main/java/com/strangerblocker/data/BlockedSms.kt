@@ -8,6 +8,7 @@ data class BlockedSms(
     val senderNumber: String,
     val messageBody: String,
     val blockedAtMillis: Long,
+    val blockReason: String = "SENDER",
 ) {
     @PrimaryKey(autoGenerate = true)
     var id: Long = 0
