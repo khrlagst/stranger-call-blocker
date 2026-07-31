@@ -1092,9 +1092,7 @@ private fun WhitelistContent(entries: List<WhitelistedNumber>, onRemove: (Whitel
 
 // ── Blocked Content ──
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -> Unit) {
     val context = LocalContext.current

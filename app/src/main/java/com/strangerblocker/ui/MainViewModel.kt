@@ -143,6 +143,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // ── Whitelist ──
+
+    val whitelisted: Flow<List<WhitelistedNumber>> = db.whitelistedNumberDao().observeAll()
+
     /** Whitelist filtered by [searchQuery] (matches number or label substring). */
     val filteredWhitelisted: StateFlow<List<WhitelistedNumber>> = combine(whitelisted, searchQuery) { list, query ->
         if (query.isBlank()) list
@@ -151,10 +155,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 (it.label?.contains(query, ignoreCase = true) == true)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // ── Whitelist ──
-
-    val whitelisted: Flow<List<WhitelistedNumber>> = db.whitelistedNumberDao().observeAll()
 
     fun addToWhitelist(number: String, label: String?) {
         viewModelScope.launch {
