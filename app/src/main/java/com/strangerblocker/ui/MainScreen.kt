@@ -822,11 +822,13 @@ private fun AboutScreen(
             }
             Spacer(Modifier.height(6.dp))
 
-            // Check for updates button
+            // Check for updates button — opens update overlay when one is available
             Surface(shape = RoundedCornerShape(12.dp),
                 color = if (updateInfo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
-                    .clickable(enabled = !checkingForUpdates, onClick = onCheckForUpdates)) {
+                    .clickable(enabled = !checkingForUpdates) {
+                        if (updateInfo != null) onUpdateClick() else onCheckForUpdates()
+                    }) {
                 Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (checkingForUpdates) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -1082,9 +1084,12 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Dark mode: hardcoded colors replaced with MaterialTheme.colorScheme",
-    "Card margins aligned (16dp padding on all dashboard cards)",
-    "TabItem: added fillMaxWidth to match indicator pill width",
+    "SMS blocking: synchronous abortBroadcast fix",
+    "SMS notification listener for Android 11+ (dismiss spam notifications)",
+    "7-day weekly chart with correct day labels",
+    "Shared toggle row component across Calls and SMS tabs",
+    "Pre-release OTA updates via check-for-updates button",
+    "Dark mode surface backgrounds and theme colors",
 )
 
 
