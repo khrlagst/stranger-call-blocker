@@ -1091,19 +1091,21 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
 
 // ── Sub-components ──
 
+private data class BadgeStyle(val bg: Color, val dot: Color, val label: String, val text: Color)
+
 @Composable
 private fun RoleBadge(isActive: Boolean, isPaused: Boolean, pauseRemainingMinutes: Int, onTap: () -> Unit) {
-    val (bgColor, dotColor, label, textColor) = when {
-        isPaused -> Triple(Color(0xFFFFF3E0), Color(0xFFF59E0B), "Paused • ${pauseRemainingMinutes.coerceAtLeast(1)}m", Color(0xFFB45309))
-        isActive -> Triple(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), MaterialTheme.colorScheme.primary, "Active", MaterialTheme.colorScheme.primary)
-        else -> Triple(Color(0xFFFEF2F2), Color(0xFFDC2626), "Inactive", Color(0xFFDC2626))
+    val style = when {
+        isPaused -> BadgeStyle(Color(0xFFFFF3E0), Color(0xFFF59E0B), "Paused • ${pauseRemainingMinutes.coerceAtLeast(1)}m", Color(0xFFB45309))
+        isActive -> BadgeStyle(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), MaterialTheme.colorScheme.primary, "Active", MaterialTheme.colorScheme.primary)
+        else -> BadgeStyle(Color(0xFFFEF2F2), Color(0xFFDC2626), "Inactive", Color(0xFFDC2626))
     }
-    Surface(shape = RoundedCornerShape(14.dp), color = bgColor,
+    Surface(shape = RoundedCornerShape(14.dp), color = style.bg,
         modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onTap)) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(dotColor))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(style.dot))
             Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, color = textColor)
+            Text(style.label, style = MaterialTheme.typography.labelSmall, color = style.text)
         }
     }
 }
