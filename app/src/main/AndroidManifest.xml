@@ -59,6 +59,21 @@
         </receiver>
 
         <!--
+            SMS Notification Listener — fallback for Android 11+ where
+            abortBroadcast() is ignored for non-default SMS apps. Dismisses
+            notifications from unknown senders.
+        -->
+        <service
+            android:name=".service.SmsNotificationListener"
+            android:exported="false"
+            android:label="Stranger Blocker SMS"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!--
             Quick Settings tile — allows toggling block state from the
             notification shade without opening the app.
         -->

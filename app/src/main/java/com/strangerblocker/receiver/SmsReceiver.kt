@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -39,21 +40,36 @@ class SmsReceiver : BroadcastReceiver() {
         val body = messages.joinToString("") { it.messageBody ?: "" }
 
         val db = (context.applicationContext as StrangerBlockerApp).db
-        scope.launch {
-            val isWhitelisted = try {
-                db.whitelistedNumberDao().isWhitelisted(sender)
-            } catch (_: Exception) { false }
 
-            if (!isWhitelisted && !isContact(context, sender)) {
-                db.blockedSmsDao().insert(
-                    BlockedSms(
-                        senderNumber = sender,
-                        messageBody = body,
-                        blockedAtMillis = System.currentTimeMillis(),
+        // ── SYNCHRONOUS check + abort ──
+        // abortBroadcast() must be called before onReceive() returns, or it
+        // is silently ignored. The whitelist query is fast (single row lookup).
+        val isWhitelisted = try {
+            runBlocking(Dispatchers.IO) {
+                db.whitelistedNumberDao().isWhitelisted(sender)
+            }
+        } catch (_: Exception) {
+            false
+        }
+
+        if (!isWhitelisted && !isContact(context, sender)) {
+            // Abort the broadcast NOW — synchronously inside onReceive().
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                abortBroadcast()
+            }
+
+            // Persist to DB in the background AFTER abort.
+            scope.launch {
+                try {
+                    db.blockedSmsDao().insert(
+                        BlockedSms(
+                            senderNumber = sender,
+                            messageBody = body,
+                            blockedAtMillis = System.currentTimeMillis(),
+                        )
                     )
-                )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    abortBroadcast()
+                } catch (_: Exception) {
+                    // silent
                 }
             }
         }
