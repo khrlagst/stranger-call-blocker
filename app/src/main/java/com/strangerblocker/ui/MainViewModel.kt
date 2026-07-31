@@ -349,11 +349,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Updates ──
 
-    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
-    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
+    private val _updateCheckResult = MutableStateFlow(UpdateCheckResult(null, null))
+    val updateCheckResult: StateFlow<UpdateCheckResult> = _updateCheckResult.asStateFlow()
 
-    val updateAvailable: StateFlow<Boolean> = _updateInfo.map { it != null }
+    val updateAvailable: StateFlow<Boolean> = _updateCheckResult.map { it.hasAny }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** The update the user chose to install from the About screen. */
+    private val _pendingUpdate = MutableStateFlow<UpdateInfo?>(null)
+    val pendingUpdate: StateFlow<UpdateInfo?> = _pendingUpdate.asStateFlow()
 
     private val _updateDownloading = MutableStateFlow(false)
     val updateDownloading: StateFlow<Boolean> = _updateDownloading.asStateFlow()
@@ -371,10 +375,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .getPackageInfo(ctx.packageName, 0)
                     .versionName ?: "0.0.0"
                 val wantPreview = _previewUpdates.value || currentVer.contains("-p")
-                val info = UpdateChecker.check(currentVer, wantPreview)
-                if (info != null && info.isNewerThan(currentVer) && info.latestVersion != currentVer) {
-                    _updateInfo.value = info
-                }
+                _updateCheckResult.value = UpdateChecker.check(currentVer, wantPreview)
             } catch (_: Exception) {
                 // silent — network error or rate limit
             } finally {
@@ -383,8 +384,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun openUpdateDialog(update: UpdateInfo) {
+        _pendingUpdate.value = update
+        showUpdateDialog.value = true
+    }
+
     fun downloadAndInstall() {
-        val info = _updateInfo.value ?: return
+        val info = _pendingUpdate.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
             _updateDownloading.value = true
             try {
@@ -392,7 +398,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val apk = File(ctx.cacheDir, "update.apk")
                 UpdateChecker.download(info.downloadUrl, apk)
                 val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", apk)
-                _updateInfo.value = null // clear banner
+                _pendingUpdate.value = null
                 _updateDownloading.value = false
                 // Launch system package installer
                 val intent = Intent(Intent.ACTION_VIEW).apply {

@@ -85,7 +85,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.strangerblocker.data.BlockedCall
-import com.strangerblocker.data.BlockedSms
+import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
 import com.strangerblocker.ui.theme.ThemeMode
@@ -110,7 +110,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val totalBlocked by viewModel.totalBlocked.collectAsState()
     val whitelisted by viewModel.whitelisted.collectAsState(initial = emptyList())
     val selectedTab by viewModel.selectedTab.collectAsState()
-    val updateInfo by viewModel.updateInfo.collectAsState()
+    val updateCheckResult by viewModel.updateCheckResult.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val updateDownloading by viewModel.updateDownloading.collectAsState()
     val checkingForUpdates by viewModel.checkingForUpdates.collectAsState()
@@ -123,6 +123,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val previewUpdates by viewModel.previewUpdates.collectAsState()
     val weeklyCounts by viewModel.weeklyCounts.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
+    val pendingUpdate by viewModel.pendingUpdate.collectAsState()
     val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
     val showAddWhitelistDialog by viewModel.showAddWhitelistDialog.collectAsState()
     val whitelistInputNumber by viewModel.whitelistInputNumber.collectAsState()
@@ -141,17 +142,24 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         } catch (_: Exception) { "?" }
     }
 
+    val smsPermissionGranted = remember {
+        android.content.pm.PackageManager.PERMISSION_GRANTED ==
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.RECEIVE_SMS
+            )
+    }
+
     // ── About screen (full screen, own Scaffold) ──
     if (showAbout) {
         AboutScreen(
             appVersion = appVersion,
-            updateInfo = updateInfo,
+            updateCheckResult = updateCheckResult,
             updateDownloading = updateDownloading,
             checkingForUpdates = checkingForUpdates,
             onCheckForUpdates = viewModel::checkForUpdates,
-            onUpdateClick = {
+            onUpdateClick = { update ->
                 viewModel.closeAbout()
-                viewModel.openUpdateDialog()
+                viewModel.openUpdateDialog(update)
             },
             onBack = viewModel::closeAbout,
         )
@@ -217,6 +225,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onIconStyleChange = viewModel::setNotificationIconStyle,
                         smsBlockingEnabled = smsBlockingEnabled,
                         onSmsToggle = viewModel::toggleSmsBlocking,
+                        smsPermissionGranted = smsPermissionGranted,
                         themeMode = themeMode,
                         onThemeChange = viewModel::setThemeMode,
                         previewUpdates = previewUpdates,
@@ -243,10 +252,12 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     }
 
     // Global dialogs
-    if (showUpdateDialog && updateInfo != null) {
+    if (showUpdateDialog && pendingUpdate != null) {
+        val update = pendingUpdate!!
         UpdateConfirmDialog(
-            version = updateInfo!!.latestVersion,
-            releaseNotes = updateInfo!!.releaseNotes,
+            version = update.latestVersion,
+            releaseNotes = update.releaseNotes,
+            isPreview = update.isPreview,
             downloading = updateDownloading,
             onCancel = viewModel::closeUpdateDialog,
             onUpdate = {
@@ -633,6 +644,7 @@ private fun SettingsTab(
     onIconStyleChange: (String) -> Unit,
     smsBlockingEnabled: Boolean,
     onSmsToggle: (Boolean) -> Unit,
+    smsPermissionGranted: Boolean,
     themeMode: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
     previewUpdates: Boolean,
@@ -697,7 +709,14 @@ private fun SettingsTab(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Block stranger SMS", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text("Silently block messages from unknown senders", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        when {
+                            !smsPermissionGranted -> "SMS permission required — tap to grant"
+                            else -> "Silently block messages from unknown senders"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (smsPermissionGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    )
                 }
                 Switch(checked = smsBlockingEnabled, onCheckedChange = onSmsToggle,
                     colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
@@ -789,11 +808,11 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onToggl
 @Composable
 private fun AboutScreen(
     appVersion: String,
-    updateInfo: UpdateInfo?,
+    updateCheckResult: UpdateCheckResult,
     updateDownloading: Boolean,
     checkingForUpdates: Boolean,
     onCheckForUpdates: () -> Unit,
-    onUpdateClick: () -> Unit,
+    onUpdateClick: (UpdateInfo) -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -822,34 +841,60 @@ private fun AboutScreen(
             }
             Spacer(Modifier.height(6.dp))
 
-            // Check for updates button — opens update overlay when one is available
-            Surface(shape = RoundedCornerShape(12.dp),
-                color = if (updateInfo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
-                    .clickable(enabled = !checkingForUpdates) {
-                        if (updateInfo != null) onUpdateClick() else onCheckForUpdates()
-                    }) {
-                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (checkingForUpdates) {
+            // Check for updates / available updates section
+            if (checkingForUpdates) {
+                Surface(shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
-                        Text("Checking for updates\u2026", style = MaterialTheme.typography.bodySmall,
-                            color = if (updateInfo != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else if (updateInfo != null) {
-                        Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Update to v${updateInfo.latestVersion}", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.weight(1f))
-                    } else {
+                        Text("Checking for updates\u2026", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else if (updateCheckResult.hasAny) {
+                // Stable update row
+                updateCheckResult.stable?.let { stable ->
+                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable { onUpdateClick(stable) }) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Update to v${stable.latestVersion} (Stable)", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.weight(1f))
+                            if (updateDownloading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            else Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimary)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                // Preview update row
+                updateCheckResult.preview?.let { preview ->
+                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable { onUpdateClick(preview) }) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Update to v${preview.latestVersion} (Preview)", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                            Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            } else {
+                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable(onClick = onCheckForUpdates)) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(8.dp))
                         Text("Check for updates", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                     }
                 }
+                Spacer(Modifier.height(16.dp))
             }
-            Spacer(Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
 
             Text("What's new", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 20.dp))
@@ -1055,10 +1100,21 @@ private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (S
 }
 
 @Composable
-private fun UpdateConfirmDialog(version: String, releaseNotes: String, downloading: Boolean, onCancel: () -> Unit, onUpdate: () -> Unit) {
+private fun UpdateConfirmDialog(version: String, releaseNotes: String, isPreview: Boolean, downloading: Boolean, onCancel: () -> Unit, onUpdate: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Update to v$version") },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Update to v$version")
+                if (isPreview) {
+                    Spacer(Modifier.width(8.dp))
+                    Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
+                        Text("Preview", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+            }
+        },
         text = { Column {
             if (releaseNotes.isNotBlank()) {
                 Text("What's changed", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -1084,12 +1140,10 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "SMS blocking: synchronous abortBroadcast fix",
-    "SMS notification listener for Android 11+ (dismiss spam notifications)",
-    "7-day weekly chart with correct day labels",
-    "Shared toggle row component across Calls and SMS tabs",
-    "Pre-release OTA updates via check-for-updates button",
-    "Dark mode surface backgrounds and theme colors",
+    "Dual-channel updates: stable and preview shown separately in About",
+    "SMS runtime permission requested on first launch",
+    "SMS permission status shown in Settings",
+    "Update dialog labels preview vs stable builds",
 )
 
 

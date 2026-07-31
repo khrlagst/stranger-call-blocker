@@ -33,6 +33,12 @@ class MainActivity : ComponentActivity() {
         // numbers (safe default).
     }
 
+    private val smsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        // SMS blocking silently no-ops if denied (SmsReceiver never fires).
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -41,6 +47,7 @@ class MainActivity : ComponentActivity() {
             requestCallScreeningRole()
         }
         requestContactsPermission()
+        requestSmsPermission()
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
@@ -77,6 +84,15 @@ class MainActivity : ComponentActivity() {
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
+
+    private fun requestSmsPermission() {
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.RECEIVE_SMS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            smsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
         }
     }
 }

@@ -11,6 +11,9 @@ data class UpdateInfo(
     val downloadUrl: String,
     val releaseNotes: String,
 ) {
+    /** True if this is a preview/pre-release version. */
+    val isPreview: Boolean get() = latestVersion.contains("-p")
+
     /** True if this version is newer than [current] (semver compare, handles -pNN preview suffix). */
     fun isNewerThan(current: String): Boolean {
         val l = latestVersion.split("-")[0].split(".").map { it.toIntOrNull() ?: 0 }
@@ -27,50 +30,51 @@ data class UpdateInfo(
     }
 }
 
+/** Result of an update check — holds the newest stable and newest preview release. */
+data class UpdateCheckResult(
+    val stable: UpdateInfo?,
+    val preview: UpdateInfo?,
+) {
+    val hasAny: Boolean get() = stable != null || preview != null
+}
+
 object UpdateChecker {
 
-    private const val API_LATEST =
-        "https://api.github.com/repos/khrlagst/stranger-call-blocker/releases/latest"
     private const val API_LIST =
         "https://api.github.com/repos/khrlagst/stranger-call-blocker/releases"
 
     /**
-     * Fetch the latest applicable release.
+     * Fetch the newest applicable releases.
      *
-     * @param currentVersion The currently installed version.
-     * @param includePreview If true, includes pre-release builds in the
-     *   search. Preview versions always set this, and stable users can opt
-     *   in via Settings.
+     * Rules:
+     * - [UpdateCheckResult.stable] is always the latest non-prerelease newer
+     *   than [currentVersion].
+     * - [UpdateCheckResult.preview] is the latest pre-release newer than
+     *   [currentVersion], only included when [includePreview] is true OR the
+     *   installed version is itself a preview.
      */
-    fun check(currentVersion: String = "", includePreview: Boolean = false): UpdateInfo? {
+    fun check(currentVersion: String = "", includePreview: Boolean = false): UpdateCheckResult {
         val wantPreview = includePreview || currentVersion.contains("-p")
-        return if (wantPreview) checkFromList(currentVersion) else checkLatest()
-    }
-
-    private fun checkLatest(): UpdateInfo? {
-        return try {
-            val response = fetch(API_LATEST)
-            val json = JSONObject(response)
-            parseRelease(json)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun checkFromList(currentVersion: String): UpdateInfo? {
         return try {
             val response = fetch(API_LIST)
             val array = JSONArray(response)
+            var stable: UpdateInfo? = null
+            var preview: UpdateInfo? = null
             for (i in 0 until array.length()) {
                 val release = array.getJSONObject(i)
                 val info = parseRelease(release) ?: continue
-                if (info.isNewerThan(currentVersion) && info.latestVersion != currentVersion) {
-                    return info
+                if (!info.isNewerThan(currentVersion) || info.latestVersion == currentVersion) continue
+                val isPrerelease = release.optBoolean("prerelease", false)
+                if (isPrerelease) {
+                    if (wantPreview && preview == null) preview = info
+                } else {
+                    if (stable == null) stable = info
                 }
+                if (stable != null && (preview != null || !wantPreview)) break
             }
-            null
+            UpdateCheckResult(stable, preview)
         } catch (_: Exception) {
-            null
+            UpdateCheckResult(null, null)
         }
     }
 
