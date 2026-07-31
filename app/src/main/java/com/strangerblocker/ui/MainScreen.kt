@@ -2,6 +2,7 @@ package com.strangerblocker.ui
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -34,7 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ClearAll
@@ -44,13 +45,16 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,6 +82,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -98,6 +103,7 @@ import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
 import com.strangerblocker.ui.theme.ThemeMode
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -131,7 +137,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val smsBlockingEnabled by viewModel.smsBlockingEnabled.collectAsState()
     val smsKeywords by viewModel.smsKeywords.collectAsState()
-    val manualBlocks by viewModel.manualBlocks.collectAsState()
     val groupedBlockedSms by viewModel.groupedBlockedSms.collectAsState()
     val totalSmsBlocked by viewModel.totalSmsBlocked.collectAsState()
     val notificationIconStyle by viewModel.notificationIconStyle.collectAsState()
@@ -145,7 +150,21 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val pendingWhitelistRemoval by viewModel.pendingWhitelistRemoval.collectAsState()
     val whitelistInputNumber by viewModel.whitelistInputNumber.collectAsState()
     val whitelistInputLabel by viewModel.whitelistInputLabel.collectAsState()
+    val showManualBlockDialog by viewModel.showManualBlockDialog.collectAsState()
+    val manualBlockInput by viewModel.manualBlockInput.collectAsState()
+    val pendingManualBlocks by viewModel.pendingManualBlocks.collectAsState()
+    val pendingWhitelistConfirm by viewModel.pendingWhitelistConfirm.collectAsState()
     val context = LocalContext.current
+
+    // Live clock so the pause countdown ("59'") ticks down in the header.
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    var showFabOptions by remember { mutableStateOf(false) }
 
     val saveCsvLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv"),
@@ -212,12 +231,32 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 Text("Stranger Blocker",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                val isPaused = pauseUntil > now
+                if (isRoleHeld) {
+                    if (isPaused) {
+                        Text("${((pauseUntil - now) / 60_000).toInt().coerceAtLeast(1)}'",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color(0xFFB45309), modifier = Modifier.padding(end = 2.dp))
+                        IconButton(onClick = {
+                            viewModel.resumeBlocking()
+                            Toast.makeText(context, "Screening is active again", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = "Resume screening", tint = Color(0xFFB45309))
+                        }
+                    } else {
+                        IconButton(onClick = {
+                            viewModel.pauseBlocking(60)
+                            Toast.makeText(context, "Screening is paused for 1 hour", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(Icons.Filled.Pause, contentDescription = "Pause screening", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
                 RoleBadge(
                     isActive = isRoleHeld,
-                    isPaused = pauseUntil > System.currentTimeMillis(),
-                    pauseRemainingMinutes = ((pauseUntil - System.currentTimeMillis()) / 60_000).toInt(),
+                    isPaused = isPaused,
                     onTap = {
-                        if (pauseUntil > System.currentTimeMillis()) viewModel.resumeBlocking()
+                        if (isPaused) viewModel.resumeBlocking()
                         else viewModel.refreshRoleStatus()
                     },
                 )
@@ -230,14 +269,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     BottomNavTab.DASHBOARD -> DashboardScreen(
                         totalBlocked = totalBlocked,
                         groupedCalls = groupedCalls,
+                        groupedBlockedSms = groupedBlockedSms,
+                        totalSmsBlocked = totalSmsBlocked,
                         weeklyCounts = weeklyCounts,
                         recentBlocked = recentBlocked,
-                        pauseUntil = pauseUntil,
-                        manualBlocks = manualBlocks,
-                        onPauseOneHour = { viewModel.pauseBlocking(60) },
-                        onResumeBlocking = viewModel::resumeBlocking,
                         onQuickWhitelist = { viewModel.addToWhitelist(it.phoneNumber, null) },
-                        onAddManualBlock = viewModel::addManualBlock,
                     )
                     BottomNavTab.CALLS -> CallsContent(
                         isBlockingEnabled = isBlockingEnabled,
@@ -304,6 +340,18 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 onSelectTab = viewModel::selectBottomTab,
             )
         }
+
+        // Floating action button — quick actions on Dashboard / Calls / SMS
+        if (bottomNavTab != BottomNavTab.SETTINGS) {
+            FloatingActionButton(
+                onClick = { showFabOptions = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 96.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Quick actions")
+            }
+        }
     }
 
     // Global dialogs
@@ -334,7 +382,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             label = whitelistInputLabel,
             onNumberChange = { viewModel.whitelistInputNumber.value = it },
             onLabelChange = { viewModel.whitelistInputLabel.value = it },
-            onAdd = viewModel::confirmAddWhitelist,
+            onAdd = viewModel::requestWhitelistConfirm,
             onDismiss = viewModel::closeAddWhitelistDialog,
             onPickContact = { pickContactLauncher.launch(null) },
             onPickRecent = {
@@ -350,6 +398,69 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             text = { Text("${entry.phoneNumber} will no longer be allowed through.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = { TextButton(onClick = viewModel::confirmRemoveWhitelist) { Text("Remove", color = Color(0xFFDC2626)) } },
             dismissButton = { TextButton(onClick = viewModel::cancelRemoveWhitelist) { Text("Cancel") } },
+        )
+    }
+
+    // FAB quick actions sheet
+    if (showFabOptions) {
+        ModalBottomSheet(onDismissRequest = { showFabOptions = false }) {
+            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+                Text("Quick actions", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth().clickable {
+                    showFabOptions = false
+                    viewModel.openManualBlockDialog()
+                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Manual block", style = MaterialTheme.typography.bodyMedium)
+                }
+                Row(Modifier.fillMaxWidth().clickable {
+                    showFabOptions = false
+                    viewModel.openAddWhitelistDialog()
+                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Whitelist", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+
+    // Manual block overlay
+    if (showManualBlockDialog) {
+        ManualBlockDialog(
+            input = manualBlockInput,
+            onInputChange = { viewModel.manualBlockInput.value = it },
+            onSave = viewModel::requestManualBlockConfirm,
+            onDismiss = viewModel::closeManualBlockDialog,
+        )
+    }
+    if (pendingManualBlocks.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = viewModel::cancelManualBlocksConfirm,
+            title = { Text("Block ${if (pendingManualBlocks.size == 1) "number" else "numbers"}?") },
+            text = {
+                Column {
+                    Text("These numbers will be blocked for both calls and SMS:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    pendingManualBlocks.forEach {
+                        Text(it, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = viewModel::confirmManualBlocks) { Text("Block", color = Color(0xFFDC2626)) } },
+            dismissButton = { TextButton(onClick = viewModel::cancelManualBlocksConfirm) { Text("Cancel") } },
+        )
+    }
+    if (pendingWhitelistConfirm != null) {
+        val entry = pendingWhitelistConfirm!!
+        AlertDialog(
+            onDismissRequest = viewModel::cancelWhitelistConfirm,
+            title = { Text("Add to whitelist?") },
+            text = { Text("${entry.phoneNumber} will be allowed through for both calls and SMS.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            confirmButton = { TextButton(onClick = viewModel::confirmWhitelistConfirm) { Text("Add", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } },
+            dismissButton = { TextButton(onClick = viewModel::cancelWhitelistConfirm) { Text("Cancel") } },
         )
     }
 }
@@ -389,18 +500,16 @@ private fun BottomNavBar(selectedTab: BottomNavTab, onSelectTab: (BottomNavTab) 
 private fun DashboardScreen(
     totalBlocked: Int,
     groupedCalls: List<CallGroup>,
+    groupedBlockedSms: List<SmsGroup>,
+    totalSmsBlocked: Int,
     weeklyCounts: List<Int>,
     recentBlocked: List<BlockedCall>,
-    pauseUntil: Long,
-    manualBlocks: Set<String>,
-    onPauseOneHour: () -> Unit,
-    onResumeBlocking: () -> Unit,
     onQuickWhitelist: (BlockedCall) -> Unit,
-    onAddManualBlock: (String) -> Unit,
 ) {
     val todayCount = groupedCalls.firstOrNull()?.calls?.size ?: 0
     val thisWeekCount = groupedCalls.takeWhile { it.header != "Earlier" }.sumOf { it.calls.size }
-    val isPaused = pauseUntil > System.currentTimeMillis()
+    val todaySmsCount = groupedBlockedSms.firstOrNull()?.smsList?.size ?: 0
+    val smsThisWeekCount = groupedBlockedSms.takeWhile { it.header != "Earlier" }.sumOf { it.smsList.size }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -421,89 +530,11 @@ private fun DashboardScreen(
                 Text("$todayCount",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
-                Text("Calls: $todayCount · SMS: 0",
+                Text("Calls: $todayCount · SMS: $todaySmsCount",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.height(12.dp))
-
-        // Pause / resume control
-        if (isPaused) {
-            Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFFF3E0),
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onResumeBlocking)) {
-                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Paused — tap to resume blocking", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = Color(0xFFB45309), modifier = Modifier.weight(1f))
-                    Text("Resume", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFFB45309))
-                }
-            }
-        } else {
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onPauseOneHour)) {
-                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Pause blocking for 1 hour", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                    Text("Pause", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-
-        // Manual block bar
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Manual Block", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                var manualInput by remember { mutableStateOf("") }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = manualInput, onValueChange = { manualInput = it },
-                        placeholder = { Text("Enter number to block") }, singleLine = true, shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f))
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = {
-                        onAddManualBlock(manualInput)
-                        manualInput = ""
-                    }, enabled = manualInput.isNotBlank()) { Text("Block", color = MaterialTheme.colorScheme.primary) }
-                }
-                if (manualBlocks.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("${manualBlocks.size} manually blocked", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-
-        // Recent Activity — last 5 blocked calls
-        if (recentBlocked.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Recent Activity", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    recentBlocked.forEach { call ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(relativeTime(call.blockedAtMillis), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            IconButton(onClick = { onQuickWhitelist(call) }) {
-                                Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
 
         // Calls This Week + SMS This Week side by side
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -533,43 +564,10 @@ private fun DashboardScreen(
                     Text("SMS This Week",
                         style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
-                    Text("0",
+                    Text("$smsThisWeekCount",
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
-                    Text("from 0 total",
+                    Text("from $totalSmsBlocked total",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-
-        // All Time — Calls + All Time — SMS
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("All Time — Calls",
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    Text("$totalBlocked",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("All Time — SMS",
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    Text("0",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -628,7 +626,34 @@ private fun DashboardScreen(
                 }
             }
         }
-        Spacer(Modifier.height(80.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // Recent Activity — last 5 blocked calls (dense)
+        if (recentBlocked.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Recent Activity", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp))
+                    recentBlocked.forEach { call ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(relativeTime(call.blockedAtMillis), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { onQuickWhitelist(call) }) {
+                                Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(100.dp))
     }
 }
 
@@ -1011,7 +1036,7 @@ private fun SettingsTab(
                     Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Spacer(Modifier.height(80.dp))
+            Spacer(Modifier.height(100.dp))
         }
     }
 }
@@ -1061,7 +1086,7 @@ private fun AboutScreen(
                 Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)
                     .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary) }
                     Text("About", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 }
                 HorizontalDivider()
@@ -1370,9 +1395,9 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
 private data class BadgeStyle(val bg: Color, val dot: Color, val label: String, val text: Color)
 
 @Composable
-private fun RoleBadge(isActive: Boolean, isPaused: Boolean, pauseRemainingMinutes: Int, onTap: () -> Unit) {
+private fun RoleBadge(isActive: Boolean, isPaused: Boolean, onTap: () -> Unit) {
     val style = when {
-        isPaused -> BadgeStyle(Color(0xFFFFF3E0), Color(0xFFF59E0B), "Paused • ${pauseRemainingMinutes.coerceAtLeast(1)}m", Color(0xFFB45309))
+        isPaused -> BadgeStyle(Color(0xFFFFF3E0), Color(0xFFF59E0B), "Paused", Color(0xFFB45309))
         isActive -> BadgeStyle(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), MaterialTheme.colorScheme.primary, "Active", MaterialTheme.colorScheme.primary)
         else -> BadgeStyle(Color(0xFFFEF2F2), Color(0xFFDC2626), "Inactive", Color(0xFFDC2626))
     }
@@ -1434,7 +1459,7 @@ private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolea
 // ── Dialogs ──
 
 @Composable
-private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (String) -> Unit, onLabelChange: (String) -> Unit, onAdd: () -> Unit, onDismiss: () -> Unit, onPickContact: () -> Unit, onPickRecent: () -> Unit) {
+private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (String) -> Unit, onLabelChange: (String) -> Unit, onAdd: (String, String) -> Unit, onDismiss: () -> Unit, onPickContact: () -> Unit, onPickRecent: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add to whitelist", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary) },
@@ -1453,8 +1478,31 @@ private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (S
             }
         },
         confirmButton = {
-            TextButton(onClick = onAdd, enabled = number.isNotBlank()) {
+            TextButton(onClick = { onAdd(number, label) }, enabled = number.isNotBlank()) {
                 Text("Add", color = if (number.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ManualBlockDialog(input: String, onInputChange: (String) -> Unit, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manual block", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary) },
+        text = {
+            Column {
+                Text("Block these numbers for calls and SMS — separate multiple numbers with commas",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = input, onValueChange = onInputChange,
+                    placeholder = { Text("Enter number(s)") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(input) }, enabled = input.isNotBlank()) {
+                Text("Save", color = if (input.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -1524,9 +1572,9 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Manual block bar — block any number for calls and SMS",
-    "Add to whitelist from contacts or recent blocked",
-    "Manual blocks override the contact check",
+    "Pause or resume blocking from the top bar with one tap",
+    "Floating action button for manual block & whitelist",
+    "Dashboard revamp: dense recent activity, cleaner cards",
 )
 
 

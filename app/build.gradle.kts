@@ -13,8 +13,8 @@ android {
         applicationId = "com.strangerblocker"
         minSdk = 29
         targetSdk = 35
-        versionCode = 58
-        versionName = "1.9.5-p31"
+        versionCode = 59
+        versionName = "1.9.5-p32"
     }
 
     signingConfigs {

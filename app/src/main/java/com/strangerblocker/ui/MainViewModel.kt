@@ -198,6 +198,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _pendingWhitelistRemoval.value = null
     }
 
+    // ── Whitelist add confirm ──
+
+    private val _pendingWhitelistConfirm = MutableStateFlow<WhitelistedNumber?>(null)
+    val pendingWhitelistConfirm: StateFlow<WhitelistedNumber?> = _pendingWhitelistConfirm.asStateFlow()
+
+    fun requestWhitelistConfirm(number: String, label: String) {
+        val trimmed = number.trim()
+        if (trimmed.isBlank()) return
+        _pendingWhitelistConfirm.value = WhitelistedNumber(
+            phoneNumber = trimmed,
+            label = label.trim().takeIf { it.isNotBlank() },
+            addedAtMillis = System.currentTimeMillis(),
+        )
+        showAddWhitelistDialog.value = false
+        whitelistInputNumber.value = ""
+        whitelistInputLabel.value = ""
+    }
+
+    fun confirmWhitelistConfirm() {
+        _pendingWhitelistConfirm.value?.let { addToWhitelist(it.phoneNumber, it.label) }
+        _pendingWhitelistConfirm.value = null
+    }
+
+    fun cancelWhitelistConfirm() {
+        _pendingWhitelistConfirm.value = null
+    }
+
     // ── SMS blocking ──
 
     private val _smsBlockingEnabled = MutableStateFlow(
@@ -295,6 +322,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updated = _manualBlocks.value - number
         prefs.edit().putStringSet("manual_blocks", updated).apply()
         _manualBlocks.value = updated
+    }
+
+    // ── Manual block overlay + confirm ──
+
+    val showManualBlockDialog = MutableStateFlow(false)
+    val manualBlockInput = MutableStateFlow("")
+
+    fun openManualBlockDialog() { showManualBlockDialog.value = true }
+    fun closeManualBlockDialog() {
+        showManualBlockDialog.value = false
+        manualBlockInput.value = ""
+    }
+
+    private val _pendingManualBlocks = MutableStateFlow<List<String>>(emptyList())
+    val pendingManualBlocks: StateFlow<List<String>> = _pendingManualBlocks.asStateFlow()
+
+    fun requestManualBlockConfirm(input: String) {
+        val numbers = input.split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (numbers.isEmpty()) return
+        _pendingManualBlocks.value = numbers
+        showManualBlockDialog.value = false
+        manualBlockInput.value = ""
+    }
+
+    fun confirmManualBlocks() {
+        _pendingManualBlocks.value.forEach { addManualBlock(it) }
+        _pendingManualBlocks.value = emptyList()
+    }
+
+    fun cancelManualBlocksConfirm() {
+        _pendingManualBlocks.value = emptyList()
     }
 
     // ── Pause blocking (temporary) ──
@@ -557,23 +615,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val whitelistInputNumber = MutableStateFlow("")
     val whitelistInputLabel = MutableStateFlow("")
-
-    fun confirmAddWhitelist() {
-        val number = whitelistInputNumber.value.trim()
-        if (number.isBlank()) return
-        viewModelScope.launch {
-            db.whitelistedNumberDao().insert(
-                WhitelistedNumber(
-                    phoneNumber = number,
-                    label = whitelistInputLabel.value.trim().takeIf { it.isNotBlank() },
-                    addedAtMillis = System.currentTimeMillis(),
-                )
-            )
-        }
-        whitelistInputNumber.value = ""
-        whitelistInputLabel.value = ""
-        showAddWhitelistDialog.value = false
-    }
 
     // ── Clear history confirmation ──
 
