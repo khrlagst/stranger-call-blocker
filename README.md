@@ -166,6 +166,7 @@ The APK is built from source via GitHub Actions. You can verify every release by
 
 | Version | Highlights |
 |---|---|
+| **1.9.5-p27** | Blocked SMS preview — sender, message snippet, whitelist action, empty-state value |
 | **1.9.5-p26** | Duplicate @OptIn + whitelist ordering fix (p25 build fix) |
 | **1.9.5-p25** | Calls search bar, frequency badge (×N), tap action menu |
 | **1.9.5-p24** | RoleBadge data class fix (p23 build fix) |

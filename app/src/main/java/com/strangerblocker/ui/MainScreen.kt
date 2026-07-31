@@ -242,7 +242,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onSelectTab = viewModel::selectTab,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
                         onRemoveWhitelist = { viewModel.removeFromWhitelist(it.phoneNumber) },
-                        onWhitelistSms = {},
+                        onWhitelistSms = { viewModel.addToWhitelist(it.senderNumber, null) },
                     )
                     BottomNavTab.SETTINGS -> SettingsTab(
                         notificationsEnabled = notificationsEnabled,
@@ -624,7 +624,7 @@ private fun CallsContent(
 private fun SmsScreen(
     smsBlockingEnabled: Boolean,
     onToggleSmsBlocking: (Boolean) -> Unit,
-    groupedBlockedSms: List<CallGroup>,
+    groupedBlockedSms: List<SmsGroup>,
     totalSmsBlocked: Int,
     whitelisted: List<WhitelistedNumber>,
     selectedTab: Tab,
@@ -691,29 +691,49 @@ private fun SmsScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SmsBlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedSms) -> Unit) {
-    if (groups.isEmpty() || groups.all { it.calls.isEmpty() }) {
+private fun SmsBlockedContent(groups: List<SmsGroup>, onWhitelist: (BlockedSms) -> Unit) {
+    if (groups.isEmpty() || groups.all { it.smsList.isEmpty() }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                 Spacer(Modifier.height(6.dp))
                 Text("No blocked SMS yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                Spacer(Modifier.height(4.dp))
+                Text("We'll display blocked messages here once detected", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
             }
         }
     } else {
         LazyColumn(Modifier.fillMaxSize()) {
             groups.forEach { group ->
-                if (group.calls.any { it is BlockedCall }) {
-                    item(key = "sms_header_${group.header}") {
-                        Text(group.header, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 2.dp))
+                stickyHeader(key = "sms_header_${group.header}") {
+                    Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(start = 12.dp, top = 8.dp, bottom = 2.dp)) {
+                        Text("${group.header} (${group.smsList.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     }
-                    // For now just show count since BlockedSms items aren't in CallGroup
+                }
+                items(group.smsList, key = { it.id }) { sms ->
+                    BlockedSmsRow(sms = sms, onWhitelist = { onWhitelist(sms) })
                 }
             }
         }
     }
+}
+
+@Composable
+private fun BlockedSmsRow(sms: BlockedSms, onWhitelist: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(sms.senderNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sms.messageBody, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(sms.blockedAtMillis)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+    HorizontalDivider(modifier = Modifier.padding(start = 36.dp), thickness = 0.5.dp)
 }
 
 // ── Settings Tab ──
@@ -1298,9 +1318,9 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Search bar filters whitelist and blocked lists live",
-    "Call frequency badge — repeated spam numbers show ×N count",
-    "Tap a blocked number for actions: whitelist, copy, call back, report",
+    "Blocked SMS now show sender, message snippet, and time",
+    "Whitelist a sender directly from a blocked SMS",
+    "SMS empty state reassures and explains",
 )
 
 

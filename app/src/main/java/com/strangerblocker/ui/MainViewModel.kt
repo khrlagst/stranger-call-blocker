@@ -46,6 +46,8 @@ import java.util.Locale
 
 data class CallGroup(val header: String, val calls: List<BlockedCall>)
 
+data class SmsGroup(val header: String, val smsList: List<BlockedSms>)
+
 enum class Tab(val label: String) {
     WHITELIST("Whitelist"),
     BLOCKED("Blocked"),
@@ -183,7 +185,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val blockedSms: Flow<List<BlockedSms>> = db.blockedSmsDao().observeAll()
 
-    val groupedBlockedSms: StateFlow<List<CallGroup>> = blockedSms.map { smsList ->
+    val groupedBlockedSms: StateFlow<List<SmsGroup>> = blockedSms.map { smsList ->
         val cal = Calendar.getInstance()
         val today = cal.get(Calendar.DAY_OF_YEAR)
         val todayYear = cal.get(Calendar.YEAR)
@@ -195,7 +197,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val year = cal.get(Calendar.YEAR)
             when { day == today && year == todayYear -> 0; day == yesterday && year == todayYear -> 1; year == todayYear -> 2; else -> 3 }
         }.entries.sortedBy { it.key }.map { (key, group) ->
-            CallGroup(when (key) { 0 -> "Today"; 1 -> "Yesterday"; 2 -> "This Week"; else -> "Earlier" }, emptyList())
+            SmsGroup(when (key) { 0 -> "Today"; 1 -> "Yesterday"; 2 -> "This Week"; else -> "Earlier" }, group)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
