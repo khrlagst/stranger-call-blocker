@@ -73,6 +73,8 @@ Before any `git commit`, run this checklist:
 | 15 | `Unresolved reference 'offset'` | `Modifier.offset(x)` needs `import androidx.compose.foundation.layout.offset` | Added explicit import |
 | 16 | `Cannot infer type for parameter` (animateDpAsState) | `tabWidth * slideProgress` type can't be inferred as `Dp` | Declared explicit `val indicatorTarget: Dp = ...` before passing to `animateDpAsState` |
 | 17 | Version comparison fails for preview tags | `isNewerThan("1.9.5-p01")` split on `.` gives `"5-p01"` which `toIntOrNull()` converts to `0` | Strip `-pNN` suffix before semver compare, then compare preview numbers separately |
+| 18 | `Unresolved reference 'UpdateCheckResult'` / delegate getValue error cascade | New data class added to `data/` but not imported in ViewModel/MainScreen — cascades into fake type-inference errors elsewhere | When adding a type in `data/`, verify ALL files referencing it have the import (grep `\bType\b` in each file) |
+| 19 | `Property delegate must have a 'getValue' method` | Cascade symptom — `collectAsState()` on a StateFlow whose type is unresolved (root cause is a missing import elsewhere) | Fix the missing type import first; the delegate error disappears |
 
 ## App UI & Navigation Guidelines
 

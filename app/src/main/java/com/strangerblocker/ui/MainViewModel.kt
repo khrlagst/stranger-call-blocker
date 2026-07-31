@@ -23,7 +23,7 @@ import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.BlockedSms
-import com.strangerblocker.data.DayCount
+import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateChecker
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
