@@ -49,8 +49,8 @@ data class CallGroup(val header: String, val calls: List<BlockedCall>)
 data class SmsGroup(val header: String, val smsList: List<BlockedSms>)
 
 enum class Tab(val label: String) {
-    WHITELIST("Whitelist"),
     BLOCKED("Blocked"),
+    WHITELIST("Whitelist"),
 }
 
 enum class BottomNavTab {
@@ -130,7 +130,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Tab selection ──
 
-    val selectedTab = MutableStateFlow(Tab.WHITELIST)
+    val selectedTab = MutableStateFlow(Tab.BLOCKED)
 
     fun selectTab(tab: Tab) { selectedTab.value = tab }
 
@@ -252,6 +252,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val totalSmsBlocked: StateFlow<Int> = blockedSms.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    /** Daily SMS counts for the last 7 days — 0=Monday .. 6=Sunday. */
+    val weeklySmsCounts: StateFlow<List<Int>> = blockedSms.map { smsList ->
+        val cal = Calendar.getInstance()
+        val nowMillis = cal.timeInMillis
+        val todayDoy = cal.get(Calendar.DAY_OF_WEEK)
+        val monOffset = (todayDoy - Calendar.MONDAY + 7) % 7
+        val midnightToday = nowMillis - (cal.get(Calendar.HOUR_OF_DAY) * 3600000L
+            + cal.get(Calendar.MINUTE) * 60000L + cal.get(Calendar.SECOND) * 1000L
+            + cal.get(Calendar.MILLISECOND))
+        val dayStart = midnightToday - monOffset * 86400000L
+        val buckets = LongArray(7) { dayStart + it * 86400000L }
+        val counts = IntArray(7)
+        for (sms in smsList) {
+            for (i in 0..6) {
+                val end = if (i < 6) buckets[i + 1] else Long.MAX_VALUE
+                if (sms.blockedAtMillis in buckets[i] until end) { counts[i]++; break }
+            }
+        }
+        counts.toList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), List(7) { 0 })
 
     fun toggleSmsBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("sms_blocking_enabled", enabled).apply()

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +14,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,6 +89,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -143,6 +146,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val themeMode by viewModel.themeMode.collectAsState()
     val previewUpdates by viewModel.previewUpdates.collectAsState()
     val weeklyCounts by viewModel.weeklyCounts.collectAsState()
+    val weeklySmsCounts by viewModel.weeklySmsCounts.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val pendingUpdate by viewModel.pendingUpdate.collectAsState()
     val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
@@ -272,6 +276,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         groupedBlockedSms = groupedBlockedSms,
                         totalSmsBlocked = totalSmsBlocked,
                         weeklyCounts = weeklyCounts,
+                        weeklySmsCounts = weeklySmsCounts,
                         recentBlocked = recentBlocked,
                         onQuickWhitelist = { viewModel.addToWhitelist(it.phoneNumber, null) },
                     )
@@ -284,7 +289,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         totalBlocked = totalBlocked,
                         whitelisted = whitelisted,
                         selectedTab = selectedTab,
-                        onToggleBlocking = viewModel::toggleBlocking,
+                        onToggleBlocking = { enabled ->
+                            viewModel.toggleBlocking(enabled)
+                            Toast.makeText(context, if (enabled) "Unknown numbers are silently rejected" else "All calls ring through", Toast.LENGTH_SHORT).show()
+                        },
                         onSelectTab = viewModel::selectTab,
                         onSearchChange = viewModel::setSearchQuery,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
@@ -503,6 +511,7 @@ private fun DashboardScreen(
     groupedBlockedSms: List<SmsGroup>,
     totalSmsBlocked: Int,
     weeklyCounts: List<Int>,
+    weeklySmsCounts: List<Int>,
     recentBlocked: List<BlockedCall>,
     onQuickWhitelist: (BlockedCall) -> Unit,
 ) {
@@ -597,26 +606,45 @@ private fun DashboardScreen(
                 }
 
                 Spacer(Modifier.height(16.dp))
-                if (weeklyCounts.all { it == 0 }) {
+                if (weeklyCounts.all { it == 0 } && weeklySmsCounts.all { it == 0 }) {
                     Text("No data this week", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                 } else {
                     val dayNames = listOf("M", "T", "W", "T", "F", "S", "S")
-                    val maxVal = weeklyCounts.max().coerceAtLeast(1)
-                    // Baseline at bottom: bars grow UPWARD
+                    val maxVal = maxOf(weeklyCounts.max(), weeklySmsCounts.max()).coerceAtLeast(1)
+                    // Baseline at bottom: bars grow UPWARD, calls + SMS side by side per day
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
                         weeklyCounts.forEachIndexed { i, count ->
-                            val barHeight = (count.toFloat() / maxVal * 100f).toInt().coerceAtLeast(if (count > 0) 4 else 0)
+                            val smsCount = weeklySmsCounts[i]
+                            val callsBarHeight = (count.toFloat() / maxVal * 96f).toInt().coerceAtLeast(if (count > 0) 4 else 0)
+                            val smsBarHeight = (smsCount.toFloat() / maxVal * 96f).toInt().coerceAtLeast(if (smsCount > 0) 4 else 0)
                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                Text("$count",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.height(2.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(barHeight.dp.coerceAtLeast(2.dp))
-                                        .clip(RoundedCornerShape(3.dp))
-                                        .background(if (i == dayNames.size - 1 || i == dayNames.size - 2) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else MaterialTheme.colorScheme.primary),
-                                )
+                                Row(Modifier.fillMaxWidth().height(120.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                        Text("$count",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(Modifier.height(2.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(callsBarHeight.dp.coerceAtLeast(2.dp))
+                                                .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                                                .background(MaterialTheme.colorScheme.primary),
+                                        )
+                                    }
+                                    Spacer(Modifier.width(3.dp))
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                        Text("$smsCount",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(Modifier.height(2.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(smsBarHeight.dp.coerceAtLeast(2.dp))
+                                                .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                                        )
+                                    }
+                                }
                                 Spacer(Modifier.height(2.dp))
                                 Text(dayNames[i],
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -688,62 +716,74 @@ private fun CallsContent(
     }
 
     Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 100.dp)) {
-            ToggleRow(
-                title = "Block stranger calls",
-                subtitle = if (isBlockingEnabled) "Unknown numbers are silently rejected" else "All calls ring through",
-                checked = isBlockingEnabled,
-                onToggle = onToggleBlocking,
-            )
+        ToggleRow(
+            title = "Block stranger calls",
+            subtitle = null,
+            checked = isBlockingEnabled,
+            onToggle = onToggleBlocking,
+        )
 
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchChange,
-                placeholder = { Text("Search number or label") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
+        TabBar(
+            pagerState = pagerState,
+            selectedTab = selectedTab,
+            whitelistCount = whitelisted.size,
+            blockedCount = totalBlocked,
+            onSelectTab = { tab ->
+                onSelectTab(tab)
+                scope.launch { pagerState.animateScrollToPage(tab.ordinal) }
+            },
+        )
+        Spacer(Modifier.height(12.dp))
 
-            TabBar(
-                pagerState = pagerState,
-                selectedTab = selectedTab,
-                whitelistCount = whitelisted.size,
-                blockedCount = totalBlocked,
-                onSelectTab = { tab ->
-                    onSelectTab(tab)
-                    scope.launch { pagerState.animateScrollToPage(tab.ordinal) }
-                },
-            )
-            Spacer(Modifier.height(12.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Column(Modifier.fillMaxSize()) {
-                    CardHeader(
-                        selectedTab = selectedTab,
-                        blockedCount = totalBlocked,
-                        onAddToWhitelist = onAddToWhitelist,
-                        onExportCsv = onExportCsv,
-                        onClearHistory = onClearHistory,
-                    )
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxSize(),
-                        ) { page ->
-                            when (page) {
-                                0 -> WhitelistContent(entries = if (searchQuery.isBlank()) whitelisted else filteredWhitelisted, onRemove = onRemoveWhitelist)
-                                1 -> BlockedContent(groups = if (searchQuery.isBlank()) groupedCalls else filteredGroupedCalls, onWhitelist = onWhitelistCall, onDelete = onDeleteBlocked)
+        Card(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp),
+                ) {
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchChange,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 12.dp),
+                        decorationBox = { inner ->
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                                if (searchQuery.isEmpty()) {
+                                    Text("Search number or label", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                inner()
                             }
+                        },
+                    )
+                }
+                CardHeader(
+                    selectedTab = selectedTab,
+                    blockedCount = totalBlocked,
+                    onAddToWhitelist = onAddToWhitelist,
+                    onExportCsv = onExportCsv,
+                    onClearHistory = onClearHistory,
+                )
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                    ) { page ->
+                        when (page) {
+                            0 -> BlockedContent(groups = if (searchQuery.isBlank()) groupedCalls else filteredGroupedCalls, onWhitelist = onWhitelistCall, onDelete = onDeleteBlocked)
+                            1 -> WhitelistContent(entries = if (searchQuery.isBlank()) whitelisted else filteredWhitelisted, onRemove = onRemoveWhitelist)
                         }
                     }
                 }
+            }
         }
     }
 }
@@ -811,8 +851,8 @@ private fun SmsScreen(
                         modifier = Modifier.fillMaxSize(),
                     ) { page ->
                         when (page) {
-                            0 -> WhitelistContent(entries = whitelisted, onRemove = onRemoveWhitelist)
-                            1 -> SmsBlockedContent(groups = groupedBlockedSms, onWhitelist = onWhitelistSms)
+                            0 -> SmsBlockedContent(groups = groupedBlockedSms, onWhitelist = onWhitelistSms)
+                            1 -> WhitelistContent(entries = whitelisted, onRemove = onRemoveWhitelist)
                         }
                     }
                 }
@@ -1044,8 +1084,8 @@ private fun SettingsTab(
 // ── Shared toggle row for Calls & SMS tabs ──
 
 @Composable
-private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
-    Spacer(Modifier.height(4.dp))
+private fun ToggleRow(title: String, subtitle: String?, checked: Boolean, onToggle: (Boolean) -> Unit) {
+    Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1053,8 +1093,10 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onToggl
             Text(title,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary)
-            Text(subtitle,
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle != null) {
+                Text(subtitle,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         Switch(
             checked = checked,
@@ -1204,10 +1246,10 @@ private fun TabBar(
                 Box(Modifier.offset(x = indicatorOffset + 3.dp).width(tabWidth - 6.dp)
                     .padding(vertical = 3.dp).height(36.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.primary))
                 Row(Modifier.fillMaxWidth().padding(3.dp)) {
-                    TabItem("Whitelist", whitelistCount, selectedTab == Tab.WHITELIST,
-                        { onSelectTab(Tab.WHITELIST) }, Modifier.weight(1f))
                     TabItem("Blocked", blockedCount, selectedTab == Tab.BLOCKED,
                         { onSelectTab(Tab.BLOCKED) }, Modifier.weight(1f))
+                    TabItem("Whitelist", whitelistCount, selectedTab == Tab.WHITELIST,
+                        { onSelectTab(Tab.WHITELIST) }, Modifier.weight(1f))
                 }
             }
         }
@@ -1572,9 +1614,8 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Pause or resume blocking from the top bar with one tap",
-    "Floating action button for manual block & whitelist",
-    "Dashboard revamp: dense recent activity, cleaner cards",
+    "Calls tab: Blocked-first tabs, search inside card, toggle toasts",
+    "Weekly chart: calls & SMS bars with flush baselines",
 )
 
 
