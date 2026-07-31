@@ -1,5 +1,7 @@
 package com.strangerblocker.ui
 
+import android.app.role.RoleManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -169,11 +171,57 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         }
     }
     var showFabOptions by remember { mutableStateOf(false) }
+    val isPaused = pauseUntil > now
+    val blockingState = when {
+        !isRoleHeld -> BlockingBannerState.ROLE_MISSING
+        !isBlockingEnabled -> BlockingBannerState.BLOCKING_OFF
+        isPaused -> BlockingBannerState.PAUSED
+        else -> BlockingBannerState.ACTIVE
+    }
+    var smsPermissionGranted by remember { mutableStateOf(checkSmsPermission(context)) }
+    var pendingCallRoleEnable by remember { mutableStateOf(false) }
+    var pendingSmsPermissionEnable by remember { mutableStateOf(false) }
 
     val saveCsvLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv"),
     ) { uri: Uri? ->
         if (uri != null) viewModel.exportCsvToUri(uri)
+    }
+
+    val roleLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        viewModel.refreshRoleStatus()
+        val roleHeld = viewModel.isRoleHeld.value
+        when {
+            pendingCallRoleEnable && roleHeld -> {
+                pendingCallRoleEnable = false
+                viewModel.toggleBlocking(true)
+                Toast.makeText(context, "Call screening role granted", Toast.LENGTH_SHORT).show()
+            }
+            pendingCallRoleEnable -> {
+                pendingCallRoleEnable = false
+                Toast.makeText(context, "Call screening role is required — call blocking won't work without it", Toast.LENGTH_LONG).show()
+            }
+            !roleHeld -> Toast.makeText(context, "Call screening role is required — call blocking won't work without it", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        smsPermissionGranted = granted
+        when {
+            granted && pendingSmsPermissionEnable -> {
+                pendingSmsPermissionEnable = false
+                viewModel.toggleSmsBlocking(true)
+                Toast.makeText(context, "SMS permission granted", Toast.LENGTH_SHORT).show()
+            }
+            !granted -> {
+                pendingSmsPermissionEnable = false
+                Toast.makeText(context, "SMS permission is required — SMS blocking won't work without it", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     val pickContactLauncher = rememberLauncherForActivityResult(
@@ -195,13 +243,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
         } catch (_: Exception) { "?" }
-    }
-
-    val smsPermissionGranted = remember {
-        android.content.pm.PackageManager.PERMISSION_GRANTED ==
-            androidx.core.content.ContextCompat.checkSelfPermission(
-                context, android.Manifest.permission.RECEIVE_SMS
-            )
     }
 
     // ── About screen (full screen, own Scaffold) ──
@@ -267,6 +308,25 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             }
             HorizontalDivider(thickness = 1.dp)
 
+            if (bottomNavTab != BottomNavTab.SETTINGS) {
+                BlockingStatusBanner(
+                    state = blockingState,
+                    remainingMinutes = ((pauseUntil - now) / 60_000).toInt().coerceAtLeast(1),
+                    onTap = {
+                        when (blockingState) {
+                            BlockingBannerState.ROLE_MISSING -> {
+                                pendingCallRoleEnable = false
+                                val rm = context.getSystemService(RoleManager::class.java)
+                                roleLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                            }
+                            BlockingBannerState.BLOCKING_OFF -> viewModel.selectBottomTab(BottomNavTab.SETTINGS)
+                            BlockingBannerState.PAUSED -> viewModel.resumeBlocking()
+                            BlockingBannerState.ACTIVE -> {}
+                        }
+                    },
+                )
+            }
+
             // Tab content
             Surface(Modifier.weight(1f).fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
                 when (bottomNavTab) {
@@ -281,7 +341,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onQuickWhitelist = { viewModel.addToWhitelist(it.phoneNumber, null) },
                     )
                     BottomNavTab.CALLS -> CallsContent(
-                        isBlockingEnabled = isBlockingEnabled,
                         groupedCalls = groupedCalls,
                         filteredGroupedCalls = filteredGroupedCalls,
                         filteredWhitelisted = filteredWhitelisted,
@@ -289,10 +348,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         totalBlocked = totalBlocked,
                         whitelisted = whitelisted,
                         selectedTab = selectedTab,
-                        onToggleBlocking = { enabled ->
-                            viewModel.toggleBlocking(enabled)
-                            Toast.makeText(context, if (enabled) "Unknown numbers are silently rejected" else "All calls ring through", Toast.LENGTH_SHORT).show()
-                        },
                         onSelectTab = viewModel::selectTab,
                         onSearchChange = viewModel::setSearchQuery,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
@@ -303,8 +358,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onDeleteBlocked = viewModel::deleteBlockedByIds,
                     )
                     BottomNavTab.SMS -> SmsScreen(
-                        smsBlockingEnabled = smsBlockingEnabled,
-                        onToggleSmsBlocking = viewModel::toggleSmsBlocking,
                         groupedBlockedSms = groupedBlockedSms,
                         totalSmsBlocked = totalSmsBlocked,
                         whitelisted = whitelisted,
@@ -315,13 +368,44 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onWhitelistSms = { viewModel.addToWhitelist(it.senderNumber, null) },
                     )
                     BottomNavTab.SETTINGS -> SettingsTab(
+                        isBlockingEnabled = isBlockingEnabled,
+                        onToggleBlocking = { enabled ->
+                            if (enabled && !isRoleHeld) {
+                                pendingCallRoleEnable = true
+                                Toast.makeText(context, "Call screening role is required for blocking", Toast.LENGTH_SHORT).show()
+                                val rm = context.getSystemService(RoleManager::class.java)
+                                roleLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                            } else {
+                                viewModel.toggleBlocking(enabled)
+                                Toast.makeText(context, if (enabled) "Unknown numbers are silently rejected" else "All calls ring through", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        smsBlockingEnabled = smsBlockingEnabled,
+                        onToggleSmsBlocking = { enabled ->
+                            if (enabled && !smsPermissionGranted) {
+                                pendingSmsPermissionEnable = true
+                                Toast.makeText(context, "SMS permission is required for blocking", Toast.LENGTH_SHORT).show()
+                                smsPermissionLauncher.launch(android.Manifest.permission.RECEIVE_SMS)
+                            } else {
+                                viewModel.toggleSmsBlocking(enabled)
+                                Toast.makeText(context, if (enabled) "Messages from unknown senders are silently blocked" else "All SMS messages ring through", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        isRoleHeld = isRoleHeld,
+                        smsPermissionGranted = smsPermissionGranted,
+                        onRequestCallScreeningRole = {
+                            pendingCallRoleEnable = false
+                            val rm = context.getSystemService(RoleManager::class.java)
+                            roleLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                        },
+                        onRequestSmsPermission = {
+                            pendingSmsPermissionEnable = false
+                            smsPermissionLauncher.launch(android.Manifest.permission.RECEIVE_SMS)
+                        },
                         notificationsEnabled = notificationsEnabled,
                         onNotificationsToggle = viewModel::toggleNotifications,
                         notificationIconStyle = notificationIconStyle,
                         onIconStyleChange = viewModel::setNotificationIconStyle,
-                        smsBlockingEnabled = smsBlockingEnabled,
-                        onSmsToggle = viewModel::toggleSmsBlocking,
-                        smsPermissionGranted = smsPermissionGranted,
                         smsKeywords = smsKeywords,
                         onAddSmsKeyword = viewModel::addSmsKeyword,
                         onRemoveSmsKeyword = viewModel::removeSmsKeyword,
@@ -345,7 +429,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         ) {
             BottomNavBar(
                 selectedTab = bottomNavTab,
-                onSelectTab = viewModel::selectBottomTab,
+                onSelectTab = { tab ->
+                    viewModel.selectBottomTab(tab)
+                    if (tab == BottomNavTab.SETTINGS) {
+                        viewModel.refreshRoleStatus()
+                        smsPermissionGranted = checkSmsPermission(context)
+                    }
+                },
             )
         }
 
@@ -689,7 +779,6 @@ private fun DashboardScreen(
 
 @Composable
 private fun CallsContent(
-    isBlockingEnabled: Boolean,
     groupedCalls: List<CallGroup>,
     filteredGroupedCalls: List<CallGroup>,
     filteredWhitelisted: List<WhitelistedNumber>,
@@ -697,7 +786,6 @@ private fun CallsContent(
     totalBlocked: Int,
     whitelisted: List<WhitelistedNumber>,
     selectedTab: Tab,
-    onToggleBlocking: (Boolean) -> Unit,
     onSelectTab: (Tab) -> Unit,
     onSearchChange: (String) -> Unit,
     onAddToWhitelist: () -> Unit,
@@ -715,14 +803,7 @@ private fun CallsContent(
         if (newTab != selectedTab) onSelectTab(newTab)
     }
 
-    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 100.dp)) {
-        ToggleRow(
-            title = "Block stranger calls",
-            subtitle = null,
-            checked = isBlockingEnabled,
-            onToggle = onToggleBlocking,
-        )
-
+    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 100.dp)) {
         TabBar(
             pagerState = pagerState,
             selectedTab = selectedTab,
@@ -752,13 +833,13 @@ private fun CallsContent(
                         value = searchQuery,
                         onValueChange = onSearchChange,
                         singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        modifier = Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 12.dp),
+                        modifier = Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 12.dp),
                         decorationBox = { inner ->
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                                 if (searchQuery.isEmpty()) {
-                                    Text("Search number or label", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Search number or label", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 inner()
                             }
@@ -792,8 +873,6 @@ private fun CallsContent(
 
 @Composable
 private fun SmsScreen(
-    smsBlockingEnabled: Boolean,
-    onToggleSmsBlocking: (Boolean) -> Unit,
     groupedBlockedSms: List<SmsGroup>,
     totalSmsBlocked: Int,
     whitelisted: List<WhitelistedNumber>,
@@ -811,14 +890,7 @@ private fun SmsScreen(
         if (newTab != selectedTab) onSelectTab(newTab)
     }
 
-    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 100.dp)) {
-        ToggleRow(
-            title = "Block stranger SMS",
-            subtitle = if (smsBlockingEnabled) "Messages from unknown numbers are silently blocked" else "All SMS messages ring through",
-            checked = smsBlockingEnabled,
-            onToggle = onToggleSmsBlocking,
-        )
-
+    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 100.dp)) {
         TabBar(
             pagerState = pagerState,
             selectedTab = selectedTab,
@@ -918,13 +990,18 @@ private fun BlockedSmsRow(sms: BlockedSms, onWhitelist: () -> Unit) {
 
 @Composable
 private fun SettingsTab(
+    isBlockingEnabled: Boolean,
+    onToggleBlocking: (Boolean) -> Unit,
+    smsBlockingEnabled: Boolean,
+    onToggleSmsBlocking: (Boolean) -> Unit,
+    isRoleHeld: Boolean,
+    smsPermissionGranted: Boolean,
+    onRequestCallScreeningRole: () -> Unit,
+    onRequestSmsPermission: () -> Unit,
     notificationsEnabled: Boolean,
     onNotificationsToggle: (Boolean) -> Unit,
     notificationIconStyle: String,
     onIconStyleChange: (String) -> Unit,
-    smsBlockingEnabled: Boolean,
-    onSmsToggle: (Boolean) -> Unit,
-    smsPermissionGranted: Boolean,
     smsKeywords: List<String>,
     onAddSmsKeyword: (String) -> Unit,
     onRemoveSmsKeyword: (String) -> Unit,
@@ -942,6 +1019,43 @@ private fun SettingsTab(
                 .padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
+            Text("Blocking", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().clickable(enabled = !isRoleHeld, onClick = onRequestCallScreeningRole).padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Block stranger calls",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        if (isRoleHeld) "Unknown numbers are silently rejected" else "Call screening role not granted — tap to grant",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isRoleHeld) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    )
+                }
+                Switch(checked = isBlockingEnabled, onCheckedChange = onToggleBlocking,
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            Spacer(Modifier.height(4.dp))
+            Row(Modifier.fillMaxWidth().clickable(enabled = !smsPermissionGranted, onClick = onRequestSmsPermission).padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Block stranger SMS",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        if (smsPermissionGranted) "Messages from unknown senders are silently blocked" else "SMS permission not granted — tap to grant",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (smsPermissionGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    )
+                }
+                Switch(checked = smsBlockingEnabled, onCheckedChange = onToggleSmsBlocking,
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            Spacer(Modifier.height(4.dp))
+
             Text("Notifications", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -989,22 +1103,6 @@ private fun SettingsTab(
 
             Text("SMS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Block stranger SMS", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text(
-                        when {
-                            !smsPermissionGranted -> "SMS permission required — tap to grant"
-                            else -> "Silently block messages from unknown senders"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (smsPermissionGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    )
-                }
-                Switch(checked = smsBlockingEnabled, onCheckedChange = onSmsToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
             // Keyword filtering
             Text("Block by keyword", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
             Text("Block SMS containing these words (e.g. Pinjaman, Hadiah, Judol)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1078,34 +1176,6 @@ private fun SettingsTab(
             }
             Spacer(Modifier.height(100.dp))
         }
-    }
-}
-
-// ── Shared toggle row for Calls & SMS tabs ──
-
-@Composable
-private fun ToggleRow(title: String, subtitle: String?, checked: Boolean, onToggle: (Boolean) -> Unit) {
-    Spacer(Modifier.height(12.dp))
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween) {
-        Column(Modifier.weight(1f)) {
-            Text(title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary)
-            if (subtitle != null) {
-                Text(subtitle,
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.primary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-            ),
-        )
     }
 }
 
@@ -1453,6 +1523,29 @@ private fun RoleBadge(isActive: Boolean, isPaused: Boolean, onTap: () -> Unit) {
     }
 }
 
+private enum class BlockingBannerState { ROLE_MISSING, BLOCKING_OFF, PAUSED, ACTIVE }
+
+@Composable
+private fun BlockingStatusBanner(state: BlockingBannerState, remainingMinutes: Int, onTap: () -> Unit) {
+    val (bg, fg, label) = when (state) {
+        BlockingBannerState.ROLE_MISSING -> Triple(Color(0xFFFEF2F2), Color(0xFFDC2626), "Call screening role not granted — tap to enable")
+        BlockingBannerState.BLOCKING_OFF -> Triple(Color(0xFFFFF3E0), Color(0xFFB45309), "Blocking is off — unknown callers will ring through")
+        BlockingBannerState.PAUSED -> Triple(Color(0xFFFFF3E0), Color(0xFFB45309), "Blocking paused — resumes in $remainingMinutes'")
+        BlockingBannerState.ACTIVE -> Triple(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), MaterialTheme.colorScheme.primary, "Blocking active — unknown callers silently rejected")
+    }
+    val tapModifier = if (state != BlockingBannerState.ACTIVE) Modifier.clickable(onClick = onTap) else Modifier
+    Surface(shape = RoundedCornerShape(12.dp), color = bg,
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp).then(tapModifier)) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = fg)
+        }
+    }
+}
+
+private fun checkSmsPermission(context: Context): Boolean =
+    android.content.pm.PackageManager.PERMISSION_GRANTED ==
+        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECEIVE_SMS)
+
 @Composable
 private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1614,8 +1707,9 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Calls tab: Blocked-first tabs, search inside card, toggle toasts",
-    "Weekly chart: calls & SMS bars with flush baselines",
+    "Settings: Blocking section with permission-aware toggles",
+    "Calls & SMS tabs: clean data views without toggles",
+    "Status banner shows when blocking is active or off",
 )
 
 
