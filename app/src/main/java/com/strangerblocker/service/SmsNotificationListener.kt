@@ -25,7 +25,7 @@ class SmsNotificationListener : NotificationListenerService() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
 
         val notif = sbn.notification ?: return
-        if (!isSmsNotification(notif)) return
+        if (notif.category != Notification.CATEGORY_MESSAGE) return
 
         val prefs = getSharedPreferences("stranger_blocker", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("sms_blocking_enabled", true)) return
@@ -46,24 +46,8 @@ class SmsNotificationListener : NotificationListenerService() {
         }
     }
 
-    private fun isSmsNotification(notif: Notification): Boolean {
-        if (notif.getStyle() is Notification.MessagingStyle) return true
-        return notif.category == Notification.CATEGORY_MESSAGE
-    }
-
     private fun extractSender(notif: Notification): String? {
-        val style = notif.getStyle()
-        if (style is Notification.MessagingStyle) {
-            val messages = style.messages
-            if (messages.isNotEmpty()) {
-                val sender = messages[messages.size - 1].sender
-                if (sender != null && sender.isNotBlank()) return sender
-            }
-        }
-        val textLines = notif.extras.getStringArray(Notification.EXTRA_TEXT_LINES)
-        if (textLines != null && textLines.isNotEmpty()) {
-            return textLines.firstOrNull()?.split(":")?.firstOrNull()?.trim()
-        }
+        // SMS notifications typically have the sender as title
         return notif.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
     }
 
