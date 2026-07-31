@@ -190,18 +190,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isBlockingEnabled: StateFlow<Boolean> = _isBlockingEnabled.asStateFlow()
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "blocking_enabled") {
-            _isBlockingEnabled.value = prefs.getBoolean("blocking_enabled", true)
+        when (key) {
+            "blocking_enabled" -> _isBlockingEnabled.value = prefs.getBoolean("blocking_enabled", true)
+            "blocking_paused_until" -> _pauseUntil.value = prefs.getLong("blocking_paused_until", 0L)
         }
     }
 
     fun refreshBlockingState() {
         _isBlockingEnabled.value = prefs.getBoolean("blocking_enabled", true)
+        _pauseUntil.value = prefs.getLong("blocking_paused_until", 0L)
     }
 
     fun toggleBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("blocking_enabled", enabled).apply()
         _isBlockingEnabled.value = enabled
+    }
+
+    // ── Pause blocking (temporary) ──
+
+    private val _pauseUntil = MutableStateFlow(prefs.getLong("blocking_paused_until", 0L))
+    val pauseUntil: StateFlow<Long> = _pauseUntil.asStateFlow()
+
+    fun pauseBlocking(durationMinutes: Int) {
+        val until = System.currentTimeMillis() + durationMinutes * 60_000L
+        prefs.edit().putLong("blocking_paused_until", until).apply()
+        _pauseUntil.value = until
+    }
+
+    fun resumeBlocking() {
+        prefs.edit().putLong("blocking_paused_until", 0L).apply()
+        _pauseUntil.value = 0L
     }
 
     // ── Notifications ──

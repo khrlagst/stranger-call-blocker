@@ -49,7 +49,7 @@ class CallBlockerService : CallScreeningService() {
             return
         }
 
-        if (!isBlockingEnabled()) {
+        if (!isBlockingEnabled() || isPaused()) {
             respondToCall(details, CallScreeningService.CallResponse.Builder().build())
             return
         }
@@ -93,6 +93,11 @@ class CallBlockerService : CallScreeningService() {
     private fun isBlockingEnabled(): Boolean {
         val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
         return prefs.getBoolean("blocking_enabled", true)
+    }
+
+    private fun isPaused(): Boolean {
+        val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
+        return prefs.getLong("blocking_paused_until", 0L) > System.currentTimeMillis()
     }
 
     private fun isNotificationsEnabled(): Boolean {

@@ -106,6 +106,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val bottomNavTab by viewModel.bottomNavTab.collectAsState()
     val showAbout by viewModel.showAbout.collectAsState()
     val isBlockingEnabled by viewModel.isBlockingEnabled.collectAsState()
+    val pauseUntil by viewModel.pauseUntil.collectAsState()
     val isRoleHeld by viewModel.isRoleHeld.collectAsState()
     val groupedCalls by viewModel.groupedCalls.collectAsState()
     val totalBlocked by viewModel.totalBlocked.collectAsState()
@@ -181,7 +182,15 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 Text("Stranger Blocker",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                RoleBadge(isActive = isRoleHeld, onTap = viewModel::refreshRoleStatus)
+                RoleBadge(
+                    isActive = isRoleHeld,
+                    isPaused = pauseUntil > System.currentTimeMillis(),
+                    pauseRemainingMinutes = ((pauseUntil - System.currentTimeMillis()) / 60_000).toInt(),
+                    onTap = {
+                        if (pauseUntil > System.currentTimeMillis()) viewModel.resumeBlocking()
+                        else viewModel.refreshRoleStatus()
+                    },
+                )
             }
             HorizontalDivider(thickness = 1.dp)
 
@@ -192,6 +201,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         totalBlocked = totalBlocked,
                         groupedCalls = groupedCalls,
                         weeklyCounts = weeklyCounts,
+                        pauseUntil = pauseUntil,
+                        onPauseOneHour = { viewModel.pauseBlocking(60) },
+                        onResumeBlocking = viewModel::resumeBlocking,
                     )
                     BottomNavTab.CALLS -> CallsContent(
                         isBlockingEnabled = isBlockingEnabled,
@@ -318,9 +330,17 @@ private fun BottomNavBar(selectedTab: BottomNavTab, onSelectTab: (BottomNavTab) 
 // ── Dashboard Tab ──
 
 @Composable
-private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>, weeklyCounts: List<Int>) {
+private fun DashboardScreen(
+    totalBlocked: Int,
+    groupedCalls: List<CallGroup>,
+    weeklyCounts: List<Int>,
+    pauseUntil: Long,
+    onPauseOneHour: () -> Unit,
+    onResumeBlocking: () -> Unit,
+) {
     val todayCount = groupedCalls.firstOrNull()?.calls?.size ?: 0
     val thisWeekCount = groupedCalls.takeWhile { it.header != "Earlier" }.sumOf { it.calls.size }
+    val isPaused = pauseUntil > System.currentTimeMillis()
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -343,6 +363,28 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>, we
                 Spacer(Modifier.height(4.dp))
                 Text("Calls: $todayCount · SMS: 0",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        // Pause / resume control
+        if (isPaused) {
+            Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFFF3E0),
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onResumeBlocking)) {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Paused — tap to resume blocking", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = Color(0xFFB45309), modifier = Modifier.weight(1f))
+                    Text("Resume", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFFB45309))
+                }
+            }
+        } else {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onPauseOneHour)) {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Pause blocking for 1 hour", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    Text("Pause", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -427,6 +469,17 @@ private fun DashboardScreen(totalBlocked: Int, groupedCalls: List<CallGroup>, we
             Column(Modifier.padding(20.dp)) {
                 Text("Weekly Activity",
                     style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                // Chart legend — calls (emerald) vs SMS (light emerald)
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.primary))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Calls", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)))
+                    Spacer(Modifier.width(4.dp))
+                    Text("SMS", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
 
                 Spacer(Modifier.height(16.dp))
                 if (weeklyCounts.all { it == 0 }) {
@@ -1039,14 +1092,18 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
 // ── Sub-components ──
 
 @Composable
-private fun RoleBadge(isActive: Boolean, onTap: () -> Unit) {
-    Surface(shape = RoundedCornerShape(14.dp), color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color(0xFFFEF2F2),
+private fun RoleBadge(isActive: Boolean, isPaused: Boolean, pauseRemainingMinutes: Int, onTap: () -> Unit) {
+    val (bgColor, dotColor, label, textColor) = when {
+        isPaused -> Triple(Color(0xFFFFF3E0), Color(0xFFF59E0B), "Paused • ${pauseRemainingMinutes.coerceAtLeast(1)}m", Color(0xFFB45309))
+        isActive -> Triple(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), MaterialTheme.colorScheme.primary, "Active", MaterialTheme.colorScheme.primary)
+        else -> Triple(Color(0xFFFEF2F2), Color(0xFFDC2626), "Inactive", Color(0xFFDC2626))
+    }
+    Surface(shape = RoundedCornerShape(14.dp), color = bgColor,
         modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onTap)) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(if (isActive) MaterialTheme.colorScheme.primary else Color(0xFFDC2626)))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(dotColor))
             Spacer(Modifier.width(6.dp))
-            Text(if (isActive) "Active" else "Inactive", style = MaterialTheme.typography.labelSmall,
-                color = if (isActive) MaterialTheme.colorScheme.primary else Color(0xFFDC2626))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = textColor)
         }
     }
 }
@@ -1141,10 +1198,10 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Dual-channel updates: stable and preview shown separately in About",
-    "SMS runtime permission requested on first launch",
-    "SMS permission status shown in Settings",
-    "Update dialog labels preview vs stable builds",
+    "Pause blocking for 1 hour from the dashboard",
+    "Paused badge with countdown — tap to resume",
+    "Call blocker respects pause state",
+    "Weekly chart legend (Calls vs SMS)",
 )
 
 
