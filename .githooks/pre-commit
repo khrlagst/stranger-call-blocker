@@ -1,0 +1,169 @@
+#!/bin/bash
+# Stranger Blocker — Pre-Commit Quality Gate
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+ERRORS=0
+pass() { echo -e "  ${GREEN}✓${NC} $1"; }
+fail() { echo -e "  ${RED}✗${NC} $1"; ERRORS=$((ERRORS + 1)); }
+warn() { echo -e "  ${YELLOW}⚠${NC} $1"; }
+
+PROJECT="app/src/main/java/com/strangerblocker"
+UI_DIR="$PROJECT/ui"
+SERVICE_DIR="$PROJECT/service"
+
+echo ""
+echo "┌─────────────────────────────────────┐"
+echo "│  Stranger Blocker — Quality Gate    │"
+echo "└─────────────────────────────────────┘"
+echo ""
+
+# ── 1. Bracket balance ──
+echo "── 1. Syntax checks ──"
+BRACKET_OK=true
+for f in $(find "$UI_DIR" "$SERVICE_DIR" "$PROJECT/data" -name "*.kt" 2>/dev/null); do
+    PARENS_OPEN=$(grep -o '(' "$f" | wc -l)
+    PARENS_CLOSE=$(grep -o ')' "$f" | wc -l)
+    BRACES_OPEN=$(grep -o '{' "$f" | wc -l)
+    BRACES_CLOSE=$(grep -o '}' "$f" | wc -l)
+    REL=$(basename "$f")
+    if [ "$PARENS_OPEN" -ne "$PARENS_CLOSE" ] || [ "$BRACES_OPEN" -ne "$BRACES_CLOSE" ]; then
+        fail "$REL: ( ) $PARENS_OPEN/$PARENS_CLOSE  { } $BRACES_OPEN/$BRACES_CLOSE"
+        BRACKET_OK=false
+    fi
+done
+$BRACKET_OK && pass "All brackets balanced"
+
+# ── 2. Stale references ──
+echo ""
+echo "── 2. Stale reference check ──"
+STALE_OK=true
+# Check for references to removed patterns
+STALE_PATTERNS=("showAboutDialog" "closeAboutDialog" "openAboutDialog" "SettingsSheet" "navigateTo" "goHome" "currentScreen")
+for pattern in "${STALE_PATTERNS[@]}"; do
+    if grep -rl "$pattern" "$UI_DIR" --include="*.kt" 2>/dev/null | grep -v "\.git" > /dev/null; then
+        fail "Stale reference '$pattern' found"
+        STALE_OK=false
+    fi
+done
+$STALE_OK && pass "No stale references"
+
+# ── 3. Duplicate functions ──
+echo ""
+echo "── 3. Duplicate check ──"
+DUP_OK=true
+for f in $(find "$UI_DIR" -name "*.kt" 2>/dev/null); do
+    DUPS=$(grep -n "^    fun \|^    private fun \|^    suspend fun " "$f" | sort | uniq -d)
+    if [ -n "$DUPS" ]; then
+        fail "$(basename "$f"): duplicate functions found"
+        echo "$DUPS"
+        DUP_OK=false
+    fi
+done
+$DUP_OK && pass "No duplicate functions"
+
+# ── 4. Import checks ──
+echo ""
+echo "── 4. Import audit ──"
+IMPORT_OK=true
+# R in sub-packages
+for f in "$SERVICE_DIR/BlockerTileService.kt" "$SERVICE_DIR/CallBlockerService.kt"; do
+    [ -f "$f" ] && if ! grep -q "import com.strangerblocker.R" "$f" 2>/dev/null; then
+        fail "$(basename "$f"): missing import com.strangerblocker.R"
+        IMPORT_OK=false
+    fi
+done
+# Uri in ViewModel
+if ! grep -q "import android.net.Uri" "$UI_DIR/MainViewModel.kt" 2>/dev/null; then
+    fail "MainViewModel.kt: missing import android.net.Uri"
+    IMPORT_OK=false
+fi
+# ThemeMode in MainScreen
+if ! grep -q "import com.strangerblocker.ui.theme.ThemeMode" "$UI_DIR/MainScreen.kt" 2>/dev/null; then
+    fail "MainScreen.kt: missing import ThemeMode"
+    IMPORT_OK=false
+fi
+# stickyHeader import (should NOT be present)
+for f in $(find "$UI_DIR" -name "*.kt" 2>/dev/null); do
+    if grep -q "import androidx.compose.foundation.lazy.stickyHeader" "$f" 2>/dev/null; then
+        fail "$(basename "$f"): should NOT import stickyHeader (it's a LazyListScope member)"
+        IMPORT_OK=false
+    fi
+done
+$IMPORT_OK && pass "All imports are correct"
+
+# ── 5. Version consistency ──
+echo ""
+echo "── 5. Version check ──"
+VERSION_OK=true
+CURRENT_TAG=$(git tag --points-at HEAD 2>/dev/null | head -1)
+BUILD_VERSION=$(grep 'versionName' "app/build.gradle.kts" | sed 's/.*"\(.*\)".*/\1/')
+# Preview tags get -pNN suffix: version should match
+if [ -n "$CURRENT_TAG" ]; then
+    TAG_VERSION=$(echo "$CURRENT_TAG" | sed 's/^v//')
+    if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
+        fail "Tag v$TAG_VERSION != build.gradle.kts version \"$BUILD_VERSION\""
+        VERSION_OK=false
+    fi
+fi
+
+# versionCode should be an integer
+if ! grep -q 'versionCode = [0-9]' "app/build.gradle.kts" 2>/dev/null; then
+    fail "versionCode must be a number"
+    VERSION_OK=false
+fi
+$VERSION_OK && pass "Version is consistent"
+
+# ── 6. Changelog ──
+echo ""
+echo "── 6. Changelog check ──"
+CL_OK=true
+if grep -q "1\.8\.9\|1\.8\.8\|1\.8\.7\|1\.8\.6" "$UI_DIR/MainScreen.kt" 2>/dev/null; then
+    # Has at least some changelog entries — basic sanity check
+    pass "Changelog present"
+else
+    warn "Changelog may be outdated"
+    CL_OK=true # warning, not error
+fi
+
+# ── 7. @OptIn annotations ──
+echo ""
+echo "── 7. @OptIn audit ──"
+OPTIN_OK=true
+for f in $(find "$UI_DIR" -name "*.kt" 2>/dev/null); do
+    if grep -q "ExperimentalFoundationApi\|ExperimentalMaterial3Api" "$f" 2>/dev/null; then
+        if ! grep -q "@OptIn" "$f" 2>/dev/null; then
+            fail "$(basename "$f"): uses experimental API without @OptIn"
+            OPTIN_OK=false
+        fi
+    fi
+done
+$OPTIN_OK && pass "@OptIn annotations present"
+
+# ── 8. README version history ──
+echo ""
+echo "── 8. README check ──"
+README_OK=true
+if [ -n "$BUILD_VERSION" ]; then
+    MAJOR_MINOR=$(echo "$BUILD_VERSION" | grep -oP '^\d+\.\d+')
+    if ! grep -q "$MAJOR_MINOR" "README.md" 2>/dev/null; then
+        warn "README version history may not include v$BUILD_VERSION"
+    else
+        pass "README version history present"
+    fi
+fi
+
+# ── Summary ──
+echo ""
+echo "───────────────────────────────────────"
+if [ $ERRORS -eq 0 ]; then
+    echo -e " ${GREEN}All checks passed.${NC}"
+    exit 0
+else
+    echo -e " ${RED}$ERRORS error(s) found. Fix before committing.${NC}"
+    exit 1
+fi

@@ -13,5 +13,4 @@ ci.keystore
 .omo/
 *.html
 *.svg
-AGENTS.md
 .ui-craft/
