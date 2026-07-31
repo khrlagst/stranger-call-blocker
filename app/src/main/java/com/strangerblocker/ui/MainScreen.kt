@@ -116,6 +116,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val isRoleHeld by viewModel.isRoleHeld.collectAsState()
     val groupedCalls by viewModel.groupedCalls.collectAsState()
     val totalBlocked by viewModel.totalBlocked.collectAsState()
+    val recentBlocked by viewModel.recentBlocked.collectAsState()
     val whitelisted by viewModel.whitelisted.collectAsState(initial = emptyList())
     val filteredGroupedCalls by viewModel.filteredGroupedCalls.collectAsState()
     val filteredWhitelisted by viewModel.filteredWhitelisted.collectAsState()
@@ -210,9 +211,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         totalBlocked = totalBlocked,
                         groupedCalls = groupedCalls,
                         weeklyCounts = weeklyCounts,
+                        recentBlocked = recentBlocked,
                         pauseUntil = pauseUntil,
                         onPauseOneHour = { viewModel.pauseBlocking(60) },
                         onResumeBlocking = viewModel::resumeBlocking,
+                        onQuickWhitelist = { viewModel.addToWhitelist(it.phoneNumber, null) },
                     )
                     BottomNavTab.CALLS -> CallsContent(
                         isBlockingEnabled = isBlockingEnabled,
@@ -347,9 +350,11 @@ private fun DashboardScreen(
     totalBlocked: Int,
     groupedCalls: List<CallGroup>,
     weeklyCounts: List<Int>,
+    recentBlocked: List<BlockedCall>,
     pauseUntil: Long,
     onPauseOneHour: () -> Unit,
     onResumeBlocking: () -> Unit,
+    onQuickWhitelist: (BlockedCall) -> Unit,
 ) {
     val todayCount = groupedCalls.firstOrNull()?.calls?.size ?: 0
     val thisWeekCount = groupedCalls.takeWhile { it.header != "Earlier" }.sumOf { it.calls.size }
@@ -401,6 +406,33 @@ private fun DashboardScreen(
             }
         }
         Spacer(Modifier.height(12.dp))
+
+        // Recent Activity — last 5 blocked calls
+        if (recentBlocked.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Recent Activity", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    recentBlocked.forEach { call ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(relativeTime(call.blockedAtMillis), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { onQuickWhitelist(call) }) {
+                                Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
         // Calls This Week + SMS This Week side by side
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -482,6 +514,7 @@ private fun DashboardScreen(
             Column(Modifier.padding(20.dp)) {
                 Text("Weekly Activity",
                     style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(weekDateRange(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
 
                 // Chart legend — calls (emerald) vs SMS (light emerald)
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1317,10 +1350,32 @@ private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () 
     )
 }
 
+private fun weekDateRange(): String {
+    val cal = java.util.Calendar.getInstance()
+    val today = cal.get(java.util.Calendar.DAY_OF_WEEK)
+    val monOffset = (today - java.util.Calendar.MONDAY + 7) % 7
+    cal.add(java.util.Calendar.DAY_OF_YEAR, -monOffset)
+    val fmt = SimpleDateFormat("MMM d", Locale.getDefault())
+    val start = fmt.format(cal.time)
+    cal.add(java.util.Calendar.DAY_OF_YEAR, 6)
+    val end = fmt.format(cal.time)
+    return "$start – $end"
+}
+
+private fun relativeTime(millis: Long): String {
+    val diff = System.currentTimeMillis() - millis
+    return when {
+        diff < 60_000 -> "just now"
+        diff < 3_600_000 -> "${diff / 60_000}m ago"
+        diff < 86_400_000 -> "${diff / 3_600_000}h ago"
+        else -> "${diff / 86_400_000}d ago"
+    }
+}
+
 private fun latestChangelog(): List<String> = listOf(
-    "Blocked SMS now show sender, message snippet, and time",
-    "Whitelist a sender directly from a blocked SMS",
-    "SMS empty state reassures and explains",
+    "Recent Activity list on dashboard — who was blocked and when",
+    "Quick whitelist straight from recent activity",
+    "Weekly chart shows the actual date range",
 )
 
 

@@ -102,6 +102,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val totalBlocked: StateFlow<Int> = blockedCalls.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    /** Last 5 blocked calls, newest first — for the dashboard recency list. */
+    val recentBlocked: StateFlow<List<BlockedCall>> = blockedCalls.map { it.take(5) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     /** Daily counts for the last 7 days — 0=Monday .. 6=Sunday. */
     val weeklyCounts: StateFlow<List<Int>> = blockedCalls.map { calls ->
         val cal = Calendar.getInstance()
