@@ -5,23 +5,8 @@
 
   **Silence unknown callers and block spam SMS before they reach you.**
 
-  <p>
-    <a href="https://github.com/khrlagst/stranger-call-blocker/releases">
-      <img src="https://img.shields.io/github/v/release/khrlagst/stranger-call-blocker?color=10B981&label=latest&style=flat" alt="GitHub Release">
-    </a>
-    <a href="https://github.com/khrlagst/stranger-call-blocker/releases">
-      <img src="https://img.shields.io/github/downloads/khrlagst/stranger-call-blocker/total?color=10B981&style=flat" alt="Downloads">
-    </a>
-    <a href="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkhrlagst%2Fstranger-call-blocker%2Fmain%2Fbadges%2Fapk-size.json">
-      <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkhrlagst%2Fstranger-call-blocker%2Fmain%2Fbadges%2Fapk-size.json&style=flat" alt="APK size">
-    </a>
-    <a href="https://snyk.io/test/github/khrlagst/stranger-call-blocker">
-      <img src="https://snyk.io/test/github/khrlagst/stranger-call-blocker/badge.svg" alt="Snyk security">
-    </a>
-    <a href="LICENSE">
-      <img src="https://img.shields.io/badge/license-MIT-10B981?style=flat" alt="License">
-    </a>
-  </p>
+  <div><a href="https://github.com/khrlagst/stranger-call-blocker/releases"><img src="https://img.shields.io/github/v/release/khrlagst/stranger-call-blocker?color=10B981&label=latest&style=flat" alt="GitHub Release"></a><a href="https://github.com/khrlagst/stranger-call-blocker/releases"><img src="https://img.shields.io/github/downloads/khrlagst/stranger-call-blocker/total?color=10B981&style=flat" alt="Downloads"></a><a href="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkhrlagst%2Fstranger-call-blocker%2Fmain%2Fbadges%2Fapk-size.json"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkhrlagst%2Fstranger-call-blocker%2Fmain%2Fbadges%2Fapk-size.json&style=flat" alt="APK size"></a><a href="https://snyk.io/test/github/khrlagst/stranger-call-blocker"><img src="https://snyk.io/test/github/khrlagst/stranger-call-blocker/badge.svg" alt="Snyk security"></a><a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10B981?style=flat" alt="License"></a></div>
+
 
   <br>
 </div>
