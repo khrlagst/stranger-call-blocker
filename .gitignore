@@ -17,3 +17,6 @@ ci.keystore
 *.html
 *.svg
 .ui-craft/
+SDK-PLAN.md
+fix-and-improvements.md
+/docs/
