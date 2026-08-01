@@ -26,7 +26,7 @@
 
 Stranger Blocker is a privacy-first Android call and SMS screening app. It intercepts incoming calls **before they ring** using the system's `CallScreeningService` — the same mechanism carriers use for spam detection — and silently rejects unknown numbers at the framework level. It also blocks SMS from unknown senders, both at broadcast time and via a notification fallback on newer Android versions.
 
-**One screen, no clutter.** No ads, no tracking, no account, no sign-in.
+**No ads, no tracking, no account, no sign-in.**
 
 ---
 
@@ -36,6 +36,9 @@ Stranger Blocker is a privacy-first Android call and SMS screening app. It inter
 |---|---|
 | **Pre-ring call blocking** | Unknown calls are intercepted by the Telecom framework before any ringtone or vibration |
 | **SMS blocking** | Messages from unknown senders are blocked via broadcast + notification fallback (Android 11+) |
+| **Spam labels** | Report blocked numbers as Spam / Scam / Telemarketer / Promo — stored locally, shown on blocked entries, auto-applies on repeat |
+| **Pattern learning** | Detects prefixes shared by several blocked numbers and flags future matches |
+| **Messaging-app controls** | Silence unknown senders on WhatsApp and other messaging apps; optionally block hidden-number VoIP calls |
 | **Contact-aware** | Numbers in your device contacts always ring through |
 | **Shared whitelist** | Allow specific numbers for both calls and SMS — with confirmation and duplicate detection |
 | **Manual block** | Block any number instantly, multiple at once, via the floating action button |
@@ -44,7 +47,7 @@ Stranger Blocker is a privacy-first Android call and SMS screening app. It inter
 | **Batch management** | Long-press to select multiple entries and delete them at once |
 | **Status banner** | Always shows whether blocking is actually active for calls and/or SMS — and why not, when it isn't |
 | **Permission-aware settings** | Each toggle shows its required permission and lets you grant it in one tap |
-| **Status bar notification** | Count of blocked calls for the current day (toggleable) |
+| **Status bar notification** | Count of blocked calls and SMS for the current day (toggleable) |
 | **Quick Settings tile** | Toggle blocking on/off from the notification shade without opening the app |
 | **OTA updates** | Checks GitHub for new releases — stable and preview channels — and installs in-place |
 | **Material 3 UI** | Emerald accent, light/dark/system themes, Jetpack Compose |
@@ -75,7 +78,7 @@ CallScreeningService (intercepted before ringing)
 
 Incoming SMS follows the same rules: whitelist, manual block, keyword filters, and contacts are checked before a message is blocked.
 
-The app never sees or stores call audio, call duration, or any conversation content. Only the phone number, timestamp, and (for SMS) the message body of *blocked* messages are saved locally — and only to answer "who did it block, and when".
+The app never sees or stores call audio, call duration, or any conversation content. Only the phone number, timestamp, and (for SMS) the message body of *blocked* messages are saved locally.
 
 ---
 
@@ -157,7 +160,10 @@ The APK is built from source via GitHub Actions, so every release can be verifie
 
 | Version | Highlights |
 |---|---|
-| **2.0.0** | Major release: SMS blocking, permission-aware Settings, date-range filters, batch select, in-card search, status banner, FAB quick actions, redesigned dashboard. Stabilized from the 1.9.5 preview line (p24–p36) |
+| **2.1.1** | Notification count refreshes when SMS are blocked and counts both channels; toggle toasts |
+| **2.1.0** | Spam labels (report as Spam/Scam/Telemarketer/Promo), pattern learning, messaging-app controls (silence unknown senders, block hidden-number VoIP calls) |
+| **2.0.1** | Dismiss blocked SMS notifications on Android 11+ via notification access |
+| **2.0.0** | SMS blocking, permission-aware Settings, date-range filters, batch select, in-card search, status banner, FAB quick actions, redesigned dashboard |
 | **1.9.2** | Icon Y fine-tune, whitelist top-aligned, notification counter fixed |
 | **1.9.1** | Icon Y-center fix, tab ripple clip, swipe fillMaxSize, circle count badge, update dot in Settings |
 | **1.9.0** | Theme support (Light/Dark/System), pill tabs with swipe, dark mode contrast, icon centering |
@@ -170,13 +176,3 @@ The APK is built from source via GitHub Actions, so every release can be verifie
 | **1.2.0** | Whitelist, grouped history, CSV export |
 | **1.1.0** | OTA updates, private number blocking |
 | **1.0.0** | Initial release |
-
----
-
-<div align="center">
-  <br>
-  <p>
-    <sub>MIT licensed. See [LICENSE](LICENSE) for details.</sub>
-  </p>
-  <br>
-</div>
