@@ -99,6 +99,7 @@ object UpdateChecker {
             conn as HttpURLConnection
             conn.connectTimeout = 10_000
             conn.readTimeout = 10_000
+            conn.setRequestProperty("User-Agent", "StrangerBlocker")
             conn.inputStream.bufferedReader().readText()
         }
     }

@@ -15,6 +15,11 @@ vMAJOR.MINOR.PATCH
 
 Always bump `versionCode` by 1 alongside `versionName` in `app/build.gradle.kts`.
 
+Rules:
+- The git tag must match `versionName` exactly — preview tags include the `-pNN` suffix (e.g. `v1.9.5-p36`), stable tags do not (`v2.0.0`).
+- Preview releases ship as GitHub **pre-releases** (the CI workflow marks any tag containing `-` as prerelease).
+- A stable release (no `-p` suffix) ends the preview line: `versionCode` keeps incrementing, `versionName` drops the suffix.
+
 ## Commit Convention
 
 ```
@@ -22,6 +27,8 @@ type: message
 ```
 
 Types: `feat`, `fix`, `chore`, `refactor`, `docs`, `ci`
+
+Recent preview commits use the `pNN: <summary>` prefix (e.g. `p36: date filters, batch select counts`) — keep using that style for previews, and `type: message` for stable and CI-only changes.
 
 Every commit must include:
 ```
@@ -75,47 +82,63 @@ Before any `git commit`, run this checklist:
 | 17 | Version comparison fails for preview tags | `isNewerThan("1.9.5-p01")` split on `.` gives `"5-p01"` which `toIntOrNull()` converts to `0` | Strip `-pNN` suffix before semver compare, then compare preview numbers separately |
 | 18 | `Unresolved reference 'UpdateCheckResult'` / delegate getValue error cascade | New data class added to `data/` but not imported in ViewModel/MainScreen — cascades into fake type-inference errors elsewhere | When adding a type in `data/`, verify ALL files referencing it have the import (grep `\bType\b` in each file) |
 | 19 | `Property delegate must have a 'getValue' method` | Cascade symptom — `collectAsState()` on a StateFlow whose type is unresolved (root cause is a missing import elsewhere) | Fix the missing type import first; the delegate error disappears |
+| 20 | `Popup` offset type mismatch | `DpOffset` not accepted by `Popup.offset` in this Compose version | Use `IntOffset` computed with `LocalDensity`: `with(LocalDensity.current) { IntOffset(0, (-104).dp.toPx().toInt()) }` |
+| 21 | `Unresolved reference 'roundToPx'` / `toPx` as member | `roundToPx` import doesn't resolve and `Density.toPx(Dp)` isn't a member in this version | `toPx` is a `Dp` extension: call `dpValue.toPx()` inside a Density receiver (`with(LocalDensity.current)`) — never `density.toPx(dpValue)` |
+| 22 | `This foundation API is experimental` on a row composable | `combinedClickable` used in a composable without the opt-in (only the parent had it) | Annotate every composable that uses the API, not just its caller |
+| 23 | Notification number badge shows +1 | `NotificationCompat.Builder.setNumber(count + 1)` — count already includes the current call | Use `setNumber(count)`; the +1 was the catalog-#13 pattern resurfacing |
+| 24 | SMS blocking behaves on before ever enabled | `SmsReceiver`/`SmsNotificationListener` defaulted `sms_blocking_enabled` to `true`, ViewModel to `false` | Align all three default reads to `false` |
 
 ## App UI & Navigation Guidelines
 
 ### Screen Architecture
 
-The app has three screens managed by `Screen` enum + `currentScreen` StateFlow in `MainViewModel`:
+The app has four bottom-nav tabs managed by `BottomNavTab` enum + `bottomNavTab` StateFlow in `MainViewModel`:
 
 ```
-HOME (default)
-  ├── Toggle: Block strangers on/off
-  ├── TabBar: Whitelist | Blocked
-  ├── Shared Card with tab content
-  └── Settings gear icon (top right)
-        │
+DASHBOARD (default)
+  ├── Blocking status banner (effective state)
+  ├── Total Blocked Today / Calls & SMS This Week / Weekly chart / Recent Activity
+  └── FAB (quick actions: Manual block, Whitelist)
+CALLS
+  ├── Search + Blocked | Whitelist tabs (Blocked FIRST) in a shared card
+  └── Card header: filter (date range) + clear; "N selected" during batch mode
+SMS
+  ├── Search + Blocked | Whitelist tabs (Blocked FIRST)
+  └── Card header: filter (date range) + clear; "N selected" during batch mode
 SETTINGS
-  ├── Back arrow
-  ├── Notification controls (Block alerts, Icon style)
-  └── About row
-        │
-ABOUT
-  ├── Back arrow → SETTINGS
-  ├── Version, description
-  ├── Update row (if available)
-  └── Changelog + GitHub link
+  ├── Blocking (permission-aware toggles for calls & SMS)
+  ├── Notifications / Notification icon / SMS keywords / Data (CSV export) / Theme / Updates / About
+  └── Section titles flush-left, section content indented 16dp
 ```
 
-### Rules for adding new screens
-- Add to `Screen` enum in `MainViewModel.kt`
-- Navigation via `viewModel.navigateTo(Screen.XXX)` and `viewModel.goHome()`
-- Use stacked screens (not nested) — no navigation library
-- Each screen gets its own `Scaffold` with top bar
-- Back navigation always uses `ArrowBack` icon
-- Global dialogs (update, clear history, add whitelist) live in the root `MainScreen` composable, not inside individual screens
+### Rules
 
-### UI style
-- Single accent: Emerald `#10B981`
-- Cards: 16dp radius, subtle elevation (`defaultElevation = 2.dp`), no flat borders
-- Section headers: uppercase, emerald color
-- Toggle switches: emerald when active
-- Sentence case everywhere — no ALL CAPS
-- Monospace font for phone numbers
+- Toggles live ONLY in Settings. Calls and SMS tabs are pure data views (search, tabs, card).
+- **Tab order is Blocked-first everywhere**: `Tab` enum order is `BLOCKED, WHITELIST`, the `TabBar` renders "Blocked" then "Whitelist", pager page 0 = Blocked content, and `selectedTab` defaults to `Tab.BLOCKED`.
+- Navigation uses stacked screens (no nav library). Each screen gets its own `Scaffold` with top bar, back arrow always `Icons.AutoMirrored.Filled.ArrowBack`.
+- Global dialogs (update, clear history, whitelist/manual-block confirms, keyword removal) live in the root `MainScreen` composable.
+- `viewModel.resetUiState()` is called when the app returns to the foreground (lifecycle `ON_START`, skipping first launch) — the app always reopens on the Dashboard with cleared search/filters/dialogs.
+
+### UI Style & Conventions
+
+- Single accent: Emerald `#10B981`. Cards: 16dp radius, `surfaceVariant` container, subtle elevation. Sentence case everywhere. Monospace for phone numbers.
+- **Overlay tint**: every dialog, popup bubble, and bottom sheet uses `MaterialTheme.colorScheme.surfaceVariant` as its container — never the default M3 surface colors, which look different from the app.
+- **Text inputs**: use the compact `SearchField` composable (38dp tall, `bodySmall` text/placeholder, 12dp radius) for ALL inputs — tab searches, dialog fields, keyword input. NEVER use M3 `OutlinedTextField` for new inputs (it cannot shrink its internal padding).
+- **Blocking status banner** reflects the *effective* state per channel, not just the role:
+  - `callsActive = isRoleHeld && isBlockingEnabled && !isPaused`
+  - `smsActive = smsPermissionGranted && smsBlockingEnabled && !isPaused`
+  - States: `ROLE_MISSING` (red, tap→grant) / `ALL_ACTIVE` (green, not tappable) / `CALLS_ONLY` / `SMS_ONLY` / `PAUSED` (tap→resume) / `NONE` (tap→Settings).
+- **FAB quick actions** open a small floating `Popup` bubble anchored to the FAB's Box (alignment `TopEnd`, `IntOffset` up ~104dp), NOT a bottom sheet.
+- **Batch selection** state is hoisted to the screen composable (`selectedIds`, `selectionMode`). The card header shows "N selected" while selecting; long-press enters selection mode. Works identically for Calls and SMS.
+- **Date-range filters**: filter icon in the card header opens a small popup with From/To date pickers + Confirm/Clear. Filter state lives in the ViewModel (`callFilterFrom/To`, `smsFilterFrom/To` + count flows) and merges into `filteredGroupedCalls`/`filteredGroupedSms` via `combine`. An active filter shows a red badge with the matching count.
+- **CSV export** lives in Settings → Data as a button. Export icons do NOT live in card headers.
+- **Whitelist adds** always go through a confirmation dialog with duplicate validation ("Already on the whitelist") and a success toast. Direct `addToWhitelist` calls are only for internal/confirmed paths.
+- **Search/filtered lists**: screens always use the ViewModel's filtered flows (`filteredGroupedCalls`, `filteredGroupedSms`, `filteredWhitelisted*`) — they return the unfiltered list when no query/filter is active, so no branching is needed at call sites.
+
+### Permission handling
+
+- Call Screening role and `RECEIVE_SMS` are granted from the Settings toggles (tap-to-grant). Toggling ON without the permission launches the grant flow and auto-enables on success; on rejection a toast explains blocking can't work without it.
+- Both `SmsReceiver` and `SmsNotificationListener` read `sms_blocking_enabled` with default `false` — keep this consistent with the ViewModel.
 
 ## Attribution
 

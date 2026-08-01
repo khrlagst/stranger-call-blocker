@@ -219,7 +219,7 @@ class CallBlockerService : CallScreeningService() {
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("$text blocked today")
                 .setContentText("Stranger Blocker is active")
-                .setNumber(count + 1)
+                .setNumber(count)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(false)
                 .setSilent(true)

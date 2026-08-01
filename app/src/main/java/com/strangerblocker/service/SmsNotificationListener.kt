@@ -28,7 +28,7 @@ class SmsNotificationListener : NotificationListenerService() {
         if (notif.category != Notification.CATEGORY_MESSAGE) return
 
         val prefs = getSharedPreferences("stranger_blocker", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("sms_blocking_enabled", true)) return
+        if (!prefs.getBoolean("sms_blocking_enabled", false)) return
 
         val sender = extractSender(notif) ?: return
         val db = (applicationContext as StrangerBlockerApp).db

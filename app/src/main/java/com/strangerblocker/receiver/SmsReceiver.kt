@@ -3,7 +3,6 @@ package com.strangerblocker.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsMessage
 import com.strangerblocker.StrangerBlockerApp
@@ -22,18 +21,9 @@ class SmsReceiver : BroadcastReceiver() {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
         val prefs = context.getSharedPreferences("stranger_blocker", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("sms_blocking_enabled", true)) return
+        if (!prefs.getBoolean("sms_blocking_enabled", false)) return
 
-        val messages: List<SmsMessage> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            Telephony.Sms.Intents.getMessagesFromIntent(intent).toList()
-        } else {
-            @Suppress("DEPRECATION")
-            val pdus = intent.extras?.get("pdus") as? Array<*> ?: return
-            pdus.mapNotNull { pdu ->
-                @Suppress("DEPRECATION")
-                SmsMessage.createFromPdu(pdu as? ByteArray ?: return@mapNotNull null)
-            }
-        }
+        val messages: List<SmsMessage> = Telephony.Sms.Intents.getMessagesFromIntent(intent).toList()
 
         val firstMsg = messages.firstOrNull() ?: return
         val sender = firstMsg.originatingAddress ?: return
@@ -62,9 +52,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         if (isManuallyBlocked || (!isWhitelisted && !isContact(context, sender)) || matchedKeyword != null) {
             // Abort the broadcast NOW — synchronously inside onReceive().
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                abortBroadcast()
-            }
+            abortBroadcast()
 
             // Persist to DB in the background AFTER abort.
             scope.launch {

@@ -403,7 +403,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         },
                     )
                     BottomNavTab.CALLS -> CallsContent(
-                        groupedCalls = groupedCalls,
                         filteredGroupedCalls = filteredGroupedCalls,
                         filteredWhitelisted = filteredWhitelisted,
                         searchQuery = searchQuery,
@@ -432,7 +431,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onDeleteBlocked = viewModel::deleteBlockedByIds,
                     )
                     BottomNavTab.SMS -> SmsScreen(
-                        groupedBlockedSms = groupedBlockedSms,
                         filteredGroupedSms = filteredGroupedSms,
                         filteredWhitelistedSms = filteredWhitelistedSms,
                         smsSearchQuery = smsSearchQuery,
@@ -895,7 +893,6 @@ private fun DashboardScreen(
 
 @Composable
 private fun CallsContent(
-    groupedCalls: List<CallGroup>,
     filteredGroupedCalls: List<CallGroup>,
     filteredWhitelisted: List<WhitelistedNumber>,
     searchQuery: String,
@@ -1002,7 +999,6 @@ private fun CallsContent(
 
 @Composable
 private fun SmsScreen(
-    groupedBlockedSms: List<SmsGroup>,
     filteredGroupedSms: List<SmsGroup>,
     filteredWhitelistedSms: List<WhitelistedNumber>,
     smsSearchQuery: String,
@@ -1529,9 +1525,14 @@ private fun AboutScreen(
             Spacer(Modifier.height(8.dp))
             Column(Modifier.padding(horizontal = 20.dp)) {
                 latestChangelog().forEach { item ->
-                    Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text("• ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        Text(item, style = MaterialTheme.typography.bodySmall)
+                    if (item.startsWith("## ")) {
+                        Text(item.removePrefix("## "), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+                    } else {
+                        Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                            Text("• ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            Text(item, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
@@ -2095,9 +2096,40 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "Date-range filters and batch-select counts on blocked lists",
-    "Settings: Data section with CSV export, indented sections",
-    "Symmetric app icon, whitelist confirmations, state reset",
+    "## Features",
+    "SMS blocking — unknown senders intercepted via broadcast, with a notification fallback on Android 11+",
+    "SMS keyword blocking with per-message reason labels",
+    "Blocked SMS previews — sender, message snippet, per-item whitelist",
+    "Search on both the Calls and SMS blocked lists",
+    "Attempt-count badges and tap-for-actions on blocked calls",
+    "Batch select & delete for blocked calls and SMS, with live count",
+    "Manual block (multiple numbers at once) and whitelist from contacts or recent calls",
+    "Quick whitelist with confirmation dialog and duplicate detection",
+    "Pause/resume blocking with live countdown in the top bar",
+    "Floating action button — manual block and whitelist quick actions",
+    "Dashboard: recent activity, calls & SMS weekly summary, 7-day dual-channel chart",
+    "Status banner showing effective blocking for calls and/or SMS",
+    "Settings: permission-aware blocking toggles with one-tap permission grant",
+    "Date-range filters on blocked lists with matching-count badge",
+    "CSV export from Settings → Data",
+    "Dark mode with light/dark/system themes",
+    "OTA updates — stable and preview channels with in-app install",
+    "## Enhancements",
+    "Blocked-first tabs with search inside the card",
+    "Compact search field reused across all inputs; uniform overlay tint",
+    "Settings sections indented for clearer navigation; tappable repo link on About",
+    "Redesigned dashboard with shared header and baseline-grounded weekly chart",
+    "Notification count now always accurate",
+    "Privacy hardening — cloud backup disabled, update files scoped to a private folder",
+    "Symmetric app icon",
+    "## Fixes",
+    "Blocked-calls Today counter no longer shows the previous day's count",
+    "Update dialog now overlays About instead of dropping back to Settings",
+    "SMS blocking no longer active before it is first enabled",
+    "Version comparison for preview builds",
+    "Dark-mode contrast and background consistency",
+    "SMS receiver reliability on Android 11+",
+    "Multiple compile fixes across the preview line",
 )
 
 

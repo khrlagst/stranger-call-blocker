@@ -682,7 +682,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _updateDownloading.value = true
             try {
                 val ctx = getApplication<Application>()
-                val apk = File(ctx.cacheDir, "update.apk")
+                val apkDir = File(ctx.cacheDir, "update").apply { mkdirs() }
+                val apk = File(apkDir, "update.apk")
                 UpdateChecker.download(info.downloadUrl, apk)
                 val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", apk)
                 _pendingUpdate.value = null
