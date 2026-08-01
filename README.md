@@ -160,6 +160,7 @@ The APK is built from source via GitHub Actions, so every release can be verifie
 
 | Version | Highlights |
 |---|---|
+| **2.1.2** | Signature-verified updates, private-number call logging, SMS history retention, ANR-safe SMS blocking |
 | **2.1.1** | Notification count refreshes when SMS are blocked and counts both channels; toggle toasts |
 | **2.1.0** | Spam labels (report as Spam/Scam/Telemarketer/Promo), pattern learning, messaging-app controls (silence unknown senders, block hidden-number VoIP calls) |
 | **2.0.1** | Dismiss blocked SMS notifications on Android 11+ via notification access |

@@ -29,8 +29,8 @@ class CallBlockerService : CallScreeningService() {
                 .setSkipNotification(false)
                 .build(),
         )
-        if (number != null && decision != CallDecision.BLOCK_PRIVATE) {
-            engine.recordBlockedCall(number)
-        }
+        // Null numbers (private/unknown calls) are logged under "(private)"
+        // so the dashboard and notification counts stay honest.
+        engine.recordBlockedCall(number)
     }
 }

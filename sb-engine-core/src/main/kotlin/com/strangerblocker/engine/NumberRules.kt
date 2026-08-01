@@ -4,6 +4,9 @@ package com.strangerblocker.engine
 /** Pure number-shape and range helpers shared by all screening paths. */
 object NumberRules {
 
+    /** Sentinel phone number stored for blocked private/unknown calls (no number on the handle). */
+    const val PRIVATE_NUMBER_LABEL = "(private)"
+
     /** True when [number] carries an actual phone number (7–15 digits). */
     fun isPhoneNumberShape(number: String): Boolean {
         val digits = number.count { it.isDigit() }

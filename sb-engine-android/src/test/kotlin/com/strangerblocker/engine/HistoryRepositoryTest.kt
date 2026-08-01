@@ -75,6 +75,19 @@ class HistoryRepositoryTest {
     }
 
     @Test
+    fun `records private-number calls under the sentinel label`() = runBlocking {
+        val repo = HistoryRepository(db)
+        repo.recordCall(NumberRules.PRIVATE_NUMBER_LABEL)
+        repo.recordCall("+6285592679948")
+
+        val calls = repo.observeCalls().first()
+        assertEquals(2, calls.size)
+        assertEquals(NumberRules.PRIVATE_NUMBER_LABEL, calls.first { it.phoneNumber == NumberRules.PRIVATE_NUMBER_LABEL }.phoneNumber)
+        // The sentinel is not phone-shaped, so it never forms a pattern.
+        assertTrue(PatternLearner.learn(calls.map { it.phoneNumber }).isEmpty())
+    }
+
+    @Test
     fun `labels upsert by number`() = runBlocking {
         val lr = LabelRepository(db)
         lr.set("+6281234567890", "SCAM")

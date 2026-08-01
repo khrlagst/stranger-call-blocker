@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Local signing credentials live in local.properties (gitignored). CI provides
+// them as environment variables. No passwords are hardcoded in this file.
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signingValue(envName: String, propName: String, default: String? = null): String? =
+    System.getenv(envName)?.takeIf { it.isNotBlank() }
+        ?: localProps.getProperty(propName)?.takeIf { it.isNotBlank() }
+        ?: default
 
 android {
     namespace = "com.strangerblocker"
@@ -12,16 +25,26 @@ android {
         applicationId = "com.strangerblocker"
         minSdk = 29
         targetSdk = 35
-        versionCode = 67
-        versionName = "2.1.1"
+        versionCode = 68
+        versionName = "2.1.2"
     }
 
     signingConfigs {
         create("ci") {
-            storeFile = rootProject.file("ci.keystore")
-            storePassword = System.getenv("CI_KEYSTORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("CI_KEY_ALIAS") ?: "strangerblocker"
-            keyPassword = System.getenv("CI_KEY_PASSWORD") ?: "android"
+            val storePassword = signingValue("CI_KEYSTORE_PASSWORD", "keystore.password")
+            val keyPassword = signingValue("CI_KEY_PASSWORD", "keystore.password")
+            if (storePassword == null || keyPassword == null) {
+                throw GradleException(
+                    "Signing password missing: set CI_KEYSTORE_PASSWORD/CI_KEY_PASSWORD " +
+                        "or keystore.password in local.properties",
+                )
+            }
+            storeFile = rootProject.file(
+                signingValue("CI_KEYSTORE_PATH", "keystore.path", "ci.keystore")!!,
+            )
+            this.storePassword = storePassword
+            keyAlias = signingValue("CI_KEY_ALIAS", "keystore.alias", "strangerblocker")!!
+            this.keyPassword = keyPassword
         }
     }
 

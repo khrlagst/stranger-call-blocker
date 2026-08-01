@@ -12,7 +12,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /** Host-provided settings for [SbEngine]. */
-class EngineConfig(val prefsName: String)
+class EngineConfig(
+    val prefsName: String,
+    /** Blocked-call and blocked-SMS history older than this many days is pruned. */
+    val retentionDays: Int = 30,
+)
 
 /**
  * The on-device spam-blocking engine. Hosts wire their framework classes
@@ -28,7 +32,9 @@ class SbEngine(
     private val prefs = appContext.getSharedPreferences(config.prefsName, Context.MODE_PRIVATE)
     private val prefsName = config.prefsName
 
-    val db: AppDatabase = AppDatabase.getInstance(appContext)
+    // The database filename derives from the prefs name so multiple engines in
+    // one process keep fully isolated data (multi-tenant / white-label hosts).
+    val db: AppDatabase = AppDatabase.getInstance(appContext, "${config.prefsName}.db")
 
     // Public data API — the raw DAOs stay accessible via [db].
     val history = HistoryRepository(db)
@@ -38,11 +44,23 @@ class SbEngine(
     private val registry = BlockedSenderRegistry(PrefsSenderStore(prefs))
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    init {
+        if (config.retentionDays > 0) {
+            scope.launch {
+                val cutoff = System.currentTimeMillis() - config.retentionDays * 86_400_000L
+                db.blockedCallDao().deleteOlderThan(cutoff)
+                db.blockedSmsDao().deleteOlderThan(cutoff)
+            }
+        }
+    }
+
     // ── Call screening ──
 
     fun shouldBlockCall(number: String?): CallDecision {
-        if (number == null) return CallDecision.BLOCK_PRIVATE
+        // The enabled/paused gate comes first: disabled means EVERYTHING
+        // rings through, including private/unknown-number calls.
         if (!isBlockingEnabled() || isPaused()) return CallDecision.ALLOW
+        if (number == null) return CallDecision.BLOCK_PRIVATE
         if (!NumberRules.isPhoneNumberShape(number)) {
             return if (blockVoipCalls()) CallDecision.BLOCK_VOIP else CallDecision.ALLOW
         }
@@ -52,10 +70,11 @@ class SbEngine(
         return CallDecision.BLOCK
     }
 
-    /** Persists a blocked call and refreshes the daily count notification. */
-    fun recordBlockedCall(number: String) {
+    /** Persists a blocked call and refreshes the daily count notification. A null number
+     *  (private/unknown call) is recorded under [NumberRules.PRIVATE_NUMBER_LABEL]. */
+    fun recordBlockedCall(number: String?) {
         scope.launch {
-            history.recordCall(number)
+            history.recordCall(number ?: NumberRules.PRIVATE_NUMBER_LABEL)
             postBlockedCountNotification()
         }
     }
@@ -120,14 +139,18 @@ class SbEngine(
     private fun isManuallyBlocked(number: String): Boolean =
         prefs.getStringSet("manual_blocks", emptySet())?.contains(number) == true
 
+    // Fail open: a transient DB error must never wrongfully block a
+    // whitelisted number. If the lookup fails, treat the number as
+    // whitelisted so the call/message rings through.
     private fun isWhitelisted(number: String): Boolean = try {
         runBlocking(Dispatchers.IO) {
             whitelist.isWhitelisted(number)
         }
     } catch (_: Exception) {
-        false
+        true
     }
 
+    // Fail open: same reasoning for the contacts lookup.
     private fun isContact(number: String): Boolean = try {
         val uri = Uri.withAppendedPath(
             ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
@@ -135,7 +158,7 @@ class SbEngine(
         )
         appContext.contentResolver.query(uri, null, null, null, null)?.use { it.count > 0 } ?: false
     } catch (_: Exception) {
-        false
+        true
     }
 
     private fun isUnknownSender(sender: String): Boolean {

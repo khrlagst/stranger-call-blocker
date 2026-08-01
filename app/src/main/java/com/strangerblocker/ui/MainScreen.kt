@@ -118,6 +118,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.engine.BlockPattern
+import com.strangerblocker.engine.NumberRules
 import com.strangerblocker.engine.SpamLabel
 import com.strangerblocker.engine.data.BlockedCall
 import com.strangerblocker.engine.data.BlockedSms
@@ -939,8 +940,10 @@ private fun DashboardScreen(
                                 Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(relativeTime(call.blockedAtMillis), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            IconButton(onClick = { onQuickWhitelist(call) }) {
-                                Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            if (NumberRules.isPhoneNumberShape(call.phoneNumber)) {
+                                IconButton(onClick = { onQuickWhitelist(call) }) {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }
@@ -1996,39 +1999,44 @@ private fun BlockedContent(
                 Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(call.blockedAtMillis)),
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(16.dp))
-                // Whitelist
-                Row(Modifier.fillMaxWidth().clickable {
-                    onWhitelist(call); selectedCall = null
-                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Whitelist number", style = MaterialTheme.typography.bodyMedium)
-                }
-                // Copy number
-                Row(Modifier.fillMaxWidth().clickable {
-                    clipboard.setText(AnnotatedString(call.phoneNumber)); selectedCall = null
-                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Copy number", style = MaterialTheme.typography.bodyMedium)
-                }
-                // Call back
-                Row(Modifier.fillMaxWidth().clickable {
-                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${call.phoneNumber}")))
-                    selectedCall = null
-                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Call back", style = MaterialTheme.typography.bodyMedium)
-                }
-                // Report spam — label this number locally
-                Row(Modifier.fillMaxWidth().clickable {
-                    onReportSpam(call)
-                    selectedCall = null
-                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Report as spam", style = MaterialTheme.typography.bodyMedium)
+                if (NumberRules.isPhoneNumberShape(call.phoneNumber)) {
+                    // Whitelist
+                    Row(Modifier.fillMaxWidth().clickable {
+                        onWhitelist(call); selectedCall = null
+                    }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Whitelist number", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    // Copy number
+                    Row(Modifier.fillMaxWidth().clickable {
+                        clipboard.setText(AnnotatedString(call.phoneNumber)); selectedCall = null
+                    }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Copy number", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    // Call back
+                    Row(Modifier.fillMaxWidth().clickable {
+                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${call.phoneNumber}")))
+                        selectedCall = null
+                    }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Call back", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    // Report spam — label this number locally
+                    Row(Modifier.fillMaxWidth().clickable {
+                        onReportSpam(call)
+                        selectedCall = null
+                    }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Report as spam", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Text("Private or unknown number — no caller ID was provided, so it cannot be whitelisted or reported.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -2155,7 +2163,9 @@ private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolea
             }
             Text(SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(call.blockedAtMillis)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (NumberRules.isPhoneNumberShape(call.phoneNumber)) {
+            IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
     }
     HorizontalDivider(modifier = Modifier.padding(start = 36.dp), thickness = 0.5.dp)
 }
@@ -2280,8 +2290,12 @@ private fun relativeTime(millis: Long): String {
 
 private fun latestChangelog(): List<String> = listOf(
     "## Fixes",
-    "Notification count now refreshes when SMS are blocked — counts calls and SMS together",
-    "Toasts added for the messaging-app and VoIP call toggles",
+    "Updates are now signature-verified before installing",
+    "Private-number calls are logged and counted in blocked history",
+    "Disabling or pausing blocking now lets private calls through",
+    "SMS history is pruned after 30 days",
+    "SMS blocking runs off the main thread — no more stalls on slow devices",
+    "Whitelist and contact lookups fail open — a transient error never blocks a known contact",
 )
 
 

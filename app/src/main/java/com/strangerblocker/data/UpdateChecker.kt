@@ -84,7 +84,12 @@ object UpdateChecker {
         val version = tag.removePrefix("v")
         val assets = json.optJSONArray("assets")
         val url = if (assets != null && assets.length() > 0) {
-            assets.getJSONObject(0).optString("browser_download_url", "")
+            val apk = (0 until assets.length()).mapNotNull { i -> assets.getJSONObject(i) }
+                .firstOrNull {
+                    val name = it.optString("name", "")
+                    name.endsWith("-release.apk") || name.endsWith(".apk")
+                }
+            (apk ?: assets.getJSONObject(0)).optString("browser_download_url", "")
         } else ""
         if (url.isEmpty()) return null
         return UpdateInfo(

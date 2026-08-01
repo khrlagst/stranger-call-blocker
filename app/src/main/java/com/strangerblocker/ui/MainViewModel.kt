@@ -6,6 +6,7 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.stateIn
@@ -325,9 +327,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Patterns learned from blocked numbers sharing a long prefix (min support 2). */
     val patterns: StateFlow<List<BlockPattern>> = combine(blockedCalls, blockedSms, _dismissedPatterns) { calls, sms, dismissed ->
-        val numbers = (calls.map { it.phoneNumber } + sms.map { it.senderNumber }).distinct()
+        val numbers = (calls.map { it.phoneNumber } + sms.map { it.senderNumber })
+            .distinct()
+            .filter { NumberRules.isPhoneNumberShape(it) }
         PatternLearner.learn(numbers).filterNot { dismissed.contains(it.prefix) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun dismissPattern(prefix: String) {
         val updated = _dismissedPatterns.value + prefix
@@ -709,6 +715,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val apkDir = File(ctx.cacheDir, "update").apply { mkdirs() }
                 val apk = File(apkDir, "update.apk")
                 UpdateChecker.download(info.downloadUrl, apk)
+                // Never hand a differently-signed APK to the installer: verify
+                // the downloaded APK's signer matches the installed app first.
+                if (!apkSignedByInstalledKey(ctx, apk)) {
+                    apk.delete()
+                    _updateDownloading.value = false
+                    return@launch
+                }
                 val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", apk)
                 _pendingUpdate.value = null
                 _updateDownloading.value = false
@@ -724,6 +737,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    /** True when [apk]'s signing certificate matches the installed app's. */
+    private fun apkSignedByInstalledKey(context: Context, apk: File): Boolean = try {
+        val pm = context.packageManager
+        val apkInfo = pm.getPackageArchiveInfo(
+            apk.absolutePath,
+            PackageManager.GET_SIGNING_CERTIFICATES,
+        ) ?: return false
+        val installedInfo = pm.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_SIGNING_CERTIFICATES,
+        ) ?: return false
+        val apkCerts = apkInfo.signingInfo?.apkContentsSigners?.map { certSha256(it.toByteArray()) }.orEmpty()
+        val installedCerts = installedInfo.signingInfo?.apkContentsSigners?.map { certSha256(it.toByteArray()) }.orEmpty()
+        apkCerts.isNotEmpty() && apkCerts == installedCerts
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun certSha256(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(bytes).joinToString("") { "%02x".format(it) }
 
     // ── Bottom Navigation ──
 

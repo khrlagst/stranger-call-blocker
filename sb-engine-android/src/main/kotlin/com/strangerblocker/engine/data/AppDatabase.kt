@@ -11,7 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [BlockedCall::class, WhitelistedNumber::class, BlockedSms::class, NumberLabel::class],
     version = 5,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -21,8 +21,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun numberLabelDao(): NumberLabelDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+        // One instance per database name so multiple engines in a single
+        // process keep isolated data (multi-tenant / white-label hosts).
+        private val INSTANCES = mutableMapOf<String, AppDatabase>()
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -67,17 +68,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        fun getInstance(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room
-                    .databaseBuilder(
-                        context.applicationContext,
-                        AppDatabase::class.java,
-                        "stranger_blocker.db",
-                    )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-                    .build()
-                    .also { INSTANCE = it }
+        fun getInstance(context: Context, name: String = "stranger_blocker.db"): AppDatabase {
+            val appContext = context.applicationContext
+            return synchronized(INSTANCES) {
+                INSTANCES.getOrPut(name) {
+                    Room
+                        .databaseBuilder(
+                            appContext,
+                            AppDatabase::class.java,
+                            name,
+                        )
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                        .build()
+                }
             }
         }
     }

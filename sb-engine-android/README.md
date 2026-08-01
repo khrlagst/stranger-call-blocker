@@ -6,8 +6,8 @@ This module bundles the data layer and the `SbEngine` facade for the Stranger
 Blocker Engine. Pair it with `sb-engine-core` (pure decision logic), which it
 depends on and re-exports.
 
-- License: [Apache-2.0](LICENSE) for OSS/non-commercial use. Commercial
-  embedding requires [LICENSE.commercial](LICENSE.commercial).
+- License: [Apache-2.0](LICENSE) — free for any use, including commercial.
+  Optional paid support/SLA: [LICENSE.commercial](LICENSE.commercial).
 
 ## Requirements
 
@@ -122,6 +122,13 @@ class NotifListener : NotificationListenerService() {
 ## Behavior notes
 
 - Unknown numbers are always blocked unless whitelisted/contacts.
+- Disabling or pausing blocking lets everything ring through, including
+  private/unknown-number calls.
 - Calls with no phone number on the handle (e.g. some VoIP) are governed by
   the `block_voip_calls` preference.
 - Blocked counts in the daily notification are always derived from the DB.
+- History (including full SMS message bodies) is stored in a plaintext,
+  app-private Room database. Default retention is 30 days
+  (`EngineConfig.retentionDays`); set it to 0 to disable pruning.
+- The blocked-sender registry keeps sender numbers in `SharedPreferences`
+  for a 10-minute window (notification-dismissal fallback).

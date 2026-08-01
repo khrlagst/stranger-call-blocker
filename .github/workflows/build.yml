@@ -41,20 +41,21 @@ jobs:
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version=8.11.1
 
-      - name: Restore or generate keystore
+      - name: Restore keystore (mandatory secret)
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 --decode > ci.keystore
-          else
-            keytool -genkey -v -keystore ci.keystore -alias strangerblocker \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass android -keypass android \
-              -dname "CN=StrangerBlocker, OU=Dev, O=Personal, L=Unknown, ST=Unknown, C=XX"
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::RELEASE_KEYSTORE secret is required — signing keys must be stable across releases."
+            exit 1
           fi
+          echo "$KEYSTORE_B64" | base64 --decode > ci.keystore
 
       - name: Build debug + release APKs
+        env:
+          CI_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          CI_KEY_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
+          CI_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: ./gradlew assembleDebug assembleRelease
 
       - name: Upload debug APK

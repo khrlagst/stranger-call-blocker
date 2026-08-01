@@ -1,21 +1,23 @@
-COMMERCIAL LICENSE — Stranger Blocker Engine
+COMMERCIAL SUPPORT & SERVICES — Stranger Blocker Engine
 
-The Stranger Blocker Engine is dual-licensed:
+The Stranger Blocker Engine is licensed under the Apache License 2.0
+(see LICENSE), which already permits commercial use, modification and
+redistribution without restriction. No separate code license is required
+to embed the engine in a proprietary product.
 
-  • Apache License 2.0 — free for open-source and non-commercial use
-    (see LICENSE).
-  • This commercial license — required for proprietary embedding and
-    commercial distribution (e.g. shipping the engine inside a closed-
-    source app, or providing it as part of a paid service).
+What the Apache-2.0 license does NOT provide is:
 
-A commercial license grants the right to embed the engine in proprietary
-products, with terms negotiated per-deal (one-time or per-device fee) and
-an optional support/SLA tier. The free Apache-2.0 version is a complete,
-working engine — commercial terms cover permission and support only.
+  • Support — guaranteed response times, integration assistance,
+    and maintenance commitments for your release cadence.
+  • SLA / indemnification — contractual uptime and liability terms
+    that enterprises typically require.
+  • Priority features — SDK work prioritized for your roadmap.
 
-To purchase a commercial license, contact:
+Those are available under a paid support/services agreement. Pricing is
+per-deal (one-time or per-device) and scoped to your integration.
+
+To purchase support or an SLA, contact:
 
   <insert contact email or website>
 
-License terms are finalized at the time of sale. Unauthorized commercial
-use is not permitted under the Apache-2.0 grant.
+Terms are finalized at the time of sale.
