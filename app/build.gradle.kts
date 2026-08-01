@@ -29,23 +29,26 @@ android {
         versionName = "2.1.2"
     }
 
-    signingConfigs {
-        create("ci") {
-            val storePassword = signingValue("CI_KEYSTORE_PASSWORD", "keystore.password")
-            val keyPassword = signingValue("CI_KEY_PASSWORD", "keystore.password")
-            if (storePassword == null || keyPassword == null) {
-                throw GradleException(
-                    "Signing password missing: set CI_KEYSTORE_PASSWORD/CI_KEY_PASSWORD " +
-                        "or keystore.password in local.properties",
+    // Signing is conditional: with credentials (CI secrets or local.properties)
+    // the release is signed; without them the build is unsigned — which is what
+    // F-Droid needs (it signs with its own key). CI fails loudly if the secrets
+    // are missing (see the workflow guard), so production never ships unsigned.
+    val storePassword = signingValue("CI_KEYSTORE_PASSWORD", "keystore.password")
+    val keyPassword = signingValue("CI_KEY_PASSWORD", "keystore.password")
+    val hasSigning = storePassword != null && keyPassword != null
+    if (hasSigning) {
+        signingConfigs {
+            create("ci") {
+                storeFile = rootProject.file(
+                    signingValue("CI_KEYSTORE_PATH", "keystore.path", "ci.keystore")!!,
                 )
+                this.storePassword = storePassword
+                keyAlias = signingValue("CI_KEY_ALIAS", "keystore.alias", "strangerblocker")!!
+                this.keyPassword = keyPassword
             }
-            storeFile = rootProject.file(
-                signingValue("CI_KEYSTORE_PATH", "keystore.path", "ci.keystore")!!,
-            )
-            this.storePassword = storePassword
-            keyAlias = signingValue("CI_KEY_ALIAS", "keystore.alias", "strangerblocker")!!
-            this.keyPassword = keyPassword
         }
+    } else {
+        logger.warn("Signing credentials missing — building unsigned (F-Droid will sign).")
     }
 
     buildTypes {
@@ -55,12 +58,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("ci")
+            if (hasSigning) signingConfig = signingConfigs.getByName("ci")
         }
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
-            signingConfig = signingConfigs.getByName("ci")
+            if (hasSigning) signingConfig = signingConfigs.getByName("ci")
         }
     }
 

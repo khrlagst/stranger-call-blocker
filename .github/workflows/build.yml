@@ -43,9 +43,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version=8.11.1
-
       - name: Restore keystore (mandatory secret)
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
@@ -57,7 +54,13 @@ jobs:
           echo "$KEYSTORE_B64" | base64 --decode > ci.keystore
 
       - name: Build debug + release APKs
-        run: ./gradlew assembleDebug assembleRelease
+        run: |
+          # Never ship an unsigned release — fail loudly if signing is misconfigured.
+          if [ -z "$CI_KEYSTORE_PASSWORD" ]; then
+            echo "::error::KEYSTORE_PASSWORD secret is required for signing."
+            exit 1
+          fi
+          ./gradlew assembleDebug assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
