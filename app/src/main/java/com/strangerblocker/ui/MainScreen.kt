@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
@@ -57,6 +58,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -68,9 +71,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -78,6 +81,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -99,11 +103,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.BlockedSms
@@ -155,9 +163,16 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val previewUpdates by viewModel.previewUpdates.collectAsState()
     val weeklyCounts by viewModel.weeklyCounts.collectAsState()
     val weeklySmsCounts by viewModel.weeklySmsCounts.collectAsState()
+    val callFilterFrom by viewModel.callFilterFrom.collectAsState()
+    val callFilterTo by viewModel.callFilterTo.collectAsState()
+    val callFilterCount by viewModel.callFilterCount.collectAsState()
+    val smsFilterFrom by viewModel.smsFilterFrom.collectAsState()
+    val smsFilterTo by viewModel.smsFilterTo.collectAsState()
+    val smsFilterCount by viewModel.smsFilterCount.collectAsState()
+    val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
+    val showClearSmsHistoryDialog by viewModel.showClearSmsHistoryDialog.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val pendingUpdate by viewModel.pendingUpdate.collectAsState()
-    val showClearHistoryDialog by viewModel.showClearHistoryDialog.collectAsState()
     val showAddWhitelistDialog by viewModel.showAddWhitelistDialog.collectAsState()
     val pendingWhitelistRemoval by viewModel.pendingWhitelistRemoval.collectAsState()
     val whitelistInputNumber by viewModel.whitelistInputNumber.collectAsState()
@@ -176,6 +191,19 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             delay(30_000)
             now = System.currentTimeMillis()
         }
+    }
+
+    // Reset UI state when the app returns to the foreground (skip the first start).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var firstUiStart by remember { mutableStateOf(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                if (firstUiStart) firstUiStart = false else viewModel.resetUiState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     var showFabOptions by remember { mutableStateOf(false) }
     var smsPermissionGranted by remember { mutableStateOf(checkSmsPermission(context)) }
@@ -366,7 +394,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         weeklyCounts = weeklyCounts,
                         weeklySmsCounts = weeklySmsCounts,
                         recentBlocked = recentBlocked,
-                        onQuickWhitelist = { viewModel.addToWhitelist(it.phoneNumber, null) },
+                        onQuickWhitelist = { call ->
+                            if (whitelisted.any { it.phoneNumber == call.phoneNumber }) {
+                                Toast.makeText(context, "Already on the whitelist", Toast.LENGTH_SHORT).show()
+                            } else {
+                                viewModel.requestWhitelistConfirm(call.phoneNumber, "")
+                            }
+                        },
                     )
                     BottomNavTab.CALLS -> CallsContent(
                         groupedCalls = groupedCalls,
@@ -376,13 +410,25 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         totalBlocked = totalBlocked,
                         whitelisted = whitelisted,
                         selectedTab = selectedTab,
+                        filterFrom = callFilterFrom,
+                        filterTo = callFilterTo,
+                        filterCount = callFilterCount,
+                        onFilterApply = { from, to ->
+                            viewModel.callFilterFrom.value = from
+                            viewModel.callFilterTo.value = to
+                        },
                         onSelectTab = viewModel::selectTab,
                         onSearchChange = viewModel::setSearchQuery,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
-                        onExportCsv = { saveCsvLauncher.launch("blocked_calls.csv") },
                         onClearHistory = viewModel::openClearHistoryDialog,
                         onRemoveWhitelist = viewModel::requestRemoveWhitelist,
-                        onWhitelistCall = { viewModel.addToWhitelist(it.phoneNumber, null) },
+                        onWhitelistCall = { call ->
+                            if (whitelisted.any { it.phoneNumber == call.phoneNumber }) {
+                                Toast.makeText(context, "Already on the whitelist", Toast.LENGTH_SHORT).show()
+                            } else {
+                                viewModel.requestWhitelistConfirm(call.phoneNumber, "")
+                            }
+                        },
                         onDeleteBlocked = viewModel::deleteBlockedByIds,
                     )
                     BottomNavTab.SMS -> SmsScreen(
@@ -393,11 +439,26 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         totalSmsBlocked = totalSmsBlocked,
                         whitelisted = whitelisted,
                         selectedTab = selectedTab,
+                        filterFrom = smsFilterFrom,
+                        filterTo = smsFilterTo,
+                        filterCount = smsFilterCount,
+                        onFilterApply = { from, to ->
+                            viewModel.smsFilterFrom.value = from
+                            viewModel.smsFilterTo.value = to
+                        },
                         onSelectTab = viewModel::selectTab,
                         onSearchChange = viewModel::setSmsSearchQuery,
                         onAddToWhitelist = viewModel::openAddWhitelistDialog,
                         onRemoveWhitelist = viewModel::requestRemoveWhitelist,
-                        onWhitelistSms = { viewModel.addToWhitelist(it.senderNumber, null) },
+                        onWhitelistSms = { sms ->
+                            if (whitelisted.any { it.phoneNumber == sms.senderNumber }) {
+                                Toast.makeText(context, "Already on the whitelist", Toast.LENGTH_SHORT).show()
+                            } else {
+                                viewModel.requestWhitelistConfirm(sms.senderNumber, "")
+                            }
+                        },
+                        onDeleteBlockedSms = viewModel::deleteBlockedSmsByIds,
+                        onClearHistory = viewModel::openClearSmsHistoryDialog,
                     )
                     BottomNavTab.SETTINGS -> SettingsTab(
                         isBlockingEnabled = isBlockingEnabled,
@@ -434,6 +495,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             pendingSmsPermissionEnable = false
                             smsPermissionLauncher.launch(android.Manifest.permission.RECEIVE_SMS)
                         },
+                        onExportData = { saveCsvLauncher.launch("blocked_calls.csv") },
                         notificationsEnabled = notificationsEnabled,
                         onNotificationsToggle = viewModel::toggleNotifications,
                         notificationIconStyle = notificationIconStyle,
@@ -490,27 +552,27 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     ) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surface,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             tonalElevation = 6.dp,
                             shadowElevation = 8.dp,
                         ) {
-                            Column(Modifier.padding(vertical = 4.dp)) {
+                            Column(Modifier.width(110.dp).padding(vertical = 2.dp)) {
                                 Row(Modifier.fillMaxWidth().clickable {
                                     showFabOptions = false
                                     viewModel.openManualBlockDialog()
-                                }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Spacer(Modifier.width(10.dp))
-                                    Text("Manual block", style = MaterialTheme.typography.bodySmall)
+                                }.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Manual block", style = MaterialTheme.typography.labelMedium)
                                 }
                                 HorizontalDivider(thickness = 0.5.dp)
                                 Row(Modifier.fillMaxWidth().clickable {
                                     showFabOptions = false
                                     viewModel.openAddWhitelistDialog()
-                                }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Spacer(Modifier.width(10.dp))
-                                    Text("Whitelist", style = MaterialTheme.typography.bodySmall)
+                                }.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Whitelist", style = MaterialTheme.typography.labelMedium)
                                 }
                             }
                         }
@@ -524,8 +586,17 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     if (showClearHistoryDialog) {
         ClearHistoryDialog(
             total = totalBlocked,
+            noun = "blocked call records",
             onDismiss = viewModel::closeClearHistoryDialog,
             onConfirm = viewModel::confirmClearHistory,
+        )
+    }
+    if (showClearSmsHistoryDialog) {
+        ClearHistoryDialog(
+            total = totalSmsBlocked,
+            noun = "blocked SMS messages",
+            onDismiss = viewModel::closeClearSmsHistoryDialog,
+            onConfirm = viewModel::confirmClearSmsHistory,
         )
     }
     if (showAddWhitelistDialog) {
@@ -546,6 +617,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         val entry = pendingWhitelistRemoval!!
         AlertDialog(
             onDismissRequest = viewModel::cancelRemoveWhitelist,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = { Text("Remove from whitelist?") },
             text = { Text("${entry.phoneNumber} will no longer be allowed through.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = { TextButton(onClick = viewModel::confirmRemoveWhitelist) { Text("Remove", color = Color(0xFFDC2626)) } },
@@ -565,6 +637,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     if (pendingManualBlocks.isNotEmpty()) {
         AlertDialog(
             onDismissRequest = viewModel::cancelManualBlocksConfirm,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = { Text("Block ${if (pendingManualBlocks.size == 1) "number" else "numbers"}?") },
             text = {
                 Column {
@@ -583,9 +656,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         val entry = pendingWhitelistConfirm!!
         AlertDialog(
             onDismissRequest = viewModel::cancelWhitelistConfirm,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = { Text("Add to whitelist?") },
             text = { Text("${entry.phoneNumber} will be allowed through for both calls and SMS.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = { TextButton(onClick = viewModel::confirmWhitelistConfirm) { Text("Add", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } },
+            confirmButton = { TextButton(onClick = {
+                viewModel.confirmWhitelistConfirm()
+                Toast.makeText(context, "${entry.phoneNumber} added to whitelist", Toast.LENGTH_SHORT).show()
+            }) { Text("Add", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) } },
             dismissButton = { TextButton(onClick = viewModel::cancelWhitelistConfirm) { Text("Cancel") } },
         )
     }
@@ -593,6 +670,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         val keyword = pendingKeywordRemoval!!
         AlertDialog(
             onDismissRequest = viewModel::cancelRemoveSmsKeyword,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = { Text("Remove keyword?") },
             text = { Text("\"$keyword\" will no longer be blocked in SMS messages.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = { TextButton(onClick = viewModel::confirmRemoveSmsKeyword) { Text("Remove", color = Color(0xFFDC2626)) } },
@@ -824,10 +902,13 @@ private fun CallsContent(
     totalBlocked: Int,
     whitelisted: List<WhitelistedNumber>,
     selectedTab: Tab,
+    filterFrom: Long?,
+    filterTo: Long?,
+    filterCount: Int,
+    onFilterApply: (Long?, Long?) -> Unit,
     onSelectTab: (Tab) -> Unit,
     onSearchChange: (String) -> Unit,
     onAddToWhitelist: () -> Unit,
-    onExportCsv: () -> Unit,
     onClearHistory: () -> Unit,
     onRemoveWhitelist: (WhitelistedNumber) -> Unit,
     onWhitelistCall: (BlockedCall) -> Unit,
@@ -835,6 +916,8 @@ private fun CallsContent(
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var selectionMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(pagerState.currentPage) {
         val newTab = Tab.entries[pagerState.currentPage]
@@ -870,8 +953,12 @@ private fun CallsContent(
                 CardHeader(
                     selectedTab = selectedTab,
                     blockedCount = totalBlocked,
+                    selectedCount = if (selectionMode) selectedIds.size else 0,
+                    filterFrom = filterFrom,
+                    filterTo = filterTo,
+                    filterCount = filterCount,
                     onAddToWhitelist = onAddToWhitelist,
-                    onExportCsv = onExportCsv,
+                    onFilterApply = onFilterApply,
                     onClearHistory = onClearHistory,
                 )
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -880,8 +967,29 @@ private fun CallsContent(
                         modifier = Modifier.fillMaxSize(),
                     ) { page ->
                         when (page) {
-                            0 -> BlockedContent(groups = if (searchQuery.isBlank()) groupedCalls else filteredGroupedCalls, onWhitelist = onWhitelistCall, onDelete = onDeleteBlocked)
-                            1 -> WhitelistContent(entries = if (searchQuery.isBlank()) whitelisted else filteredWhitelisted, onRemove = onRemoveWhitelist)
+                            0 -> BlockedContent(
+                                groups = filteredGroupedCalls,
+                                onWhitelist = onWhitelistCall,
+                                selectedIds = selectedIds,
+                                selectionMode = selectionMode,
+                                onToggleSelect = { call ->
+                                    selectedIds = if (selectedIds.contains(call.id)) selectedIds - call.id else selectedIds + call.id
+                                },
+                                onLongPress = { call ->
+                                    selectionMode = true
+                                    selectedIds = selectedIds + call.id
+                                },
+                                onClearSelection = {
+                                    selectedIds = emptySet()
+                                    selectionMode = false
+                                },
+                                onDelete = { ids ->
+                                    onDeleteBlocked(ids)
+                                    selectedIds = emptySet()
+                                    selectionMode = false
+                                },
+                            )
+                            1 -> WhitelistContent(entries = filteredWhitelisted, onRemove = onRemoveWhitelist)
                         }
                     }
                 }
@@ -901,14 +1009,22 @@ private fun SmsScreen(
     totalSmsBlocked: Int,
     whitelisted: List<WhitelistedNumber>,
     selectedTab: Tab,
+    filterFrom: Long?,
+    filterTo: Long?,
+    filterCount: Int,
+    onFilterApply: (Long?, Long?) -> Unit,
     onSelectTab: (Tab) -> Unit,
     onSearchChange: (String) -> Unit,
     onAddToWhitelist: () -> Unit,
     onRemoveWhitelist: (WhitelistedNumber) -> Unit,
     onWhitelistSms: (BlockedSms) -> Unit,
+    onDeleteBlockedSms: (List<Long>) -> Unit,
+    onClearHistory: () -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    var selectedSmsIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var smsSelectionMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(pagerState.currentPage) {
         val newTab = Tab.entries[pagerState.currentPage]
@@ -944,9 +1060,13 @@ private fun SmsScreen(
                 CardHeader(
                     selectedTab = selectedTab,
                     blockedCount = totalSmsBlocked,
+                    selectedCount = if (smsSelectionMode) selectedSmsIds.size else 0,
+                    filterFrom = filterFrom,
+                    filterTo = filterTo,
+                    filterCount = filterCount,
                     onAddToWhitelist = onAddToWhitelist,
-                    onExportCsv = {},  // SMS CSV export not yet implemented
-                    onClearHistory = {},  // SMS clear not yet implemented
+                    onFilterApply = onFilterApply,
+                    onClearHistory = onClearHistory,
                 )
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     HorizontalPager(
@@ -954,8 +1074,29 @@ private fun SmsScreen(
                         modifier = Modifier.fillMaxSize(),
                     ) { page ->
                         when (page) {
-                            0 -> SmsBlockedContent(groups = if (smsSearchQuery.isBlank()) groupedBlockedSms else filteredGroupedSms, onWhitelist = onWhitelistSms)
-                            1 -> WhitelistContent(entries = if (smsSearchQuery.isBlank()) whitelisted else filteredWhitelistedSms, onRemove = onRemoveWhitelist)
+                            0 -> SmsBlockedContent(
+                                groups = filteredGroupedSms,
+                                selectedSmsIds = selectedSmsIds,
+                                selectionMode = smsSelectionMode,
+                                onToggleSelect = { sms ->
+                                    selectedSmsIds = if (selectedSmsIds.contains(sms.id)) selectedSmsIds - sms.id else selectedSmsIds + sms.id
+                                },
+                                onLongPress = { sms ->
+                                    smsSelectionMode = true
+                                    selectedSmsIds = selectedSmsIds + sms.id
+                                },
+                                onClearSelection = {
+                                    selectedSmsIds = emptySet()
+                                    smsSelectionMode = false
+                                },
+                                onWhitelist = onWhitelistSms,
+                                onDelete = { ids ->
+                                    onDeleteBlockedSms(ids)
+                                    selectedSmsIds = emptySet()
+                                    smsSelectionMode = false
+                                },
+                            )
+                            1 -> WhitelistContent(entries = filteredWhitelistedSms, onRemove = onRemoveWhitelist)
                         }
                     }
                 }
@@ -966,7 +1107,16 @@ private fun SmsScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SmsBlockedContent(groups: List<SmsGroup>, onWhitelist: (BlockedSms) -> Unit) {
+private fun SmsBlockedContent(
+    groups: List<SmsGroup>,
+    selectedSmsIds: Set<Long>,
+    selectionMode: Boolean,
+    onToggleSelect: (BlockedSms) -> Unit,
+    onLongPress: (BlockedSms) -> Unit,
+    onClearSelection: () -> Unit,
+    onWhitelist: (BlockedSms) -> Unit,
+    onDelete: (List<Long>) -> Unit,
+) {
     if (groups.isEmpty() || groups.all { it.smsList.isEmpty() }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -986,16 +1136,41 @@ private fun SmsBlockedContent(groups: List<SmsGroup>, onWhitelist: (BlockedSms) 
                     }
                 }
                 items(group.smsList, key = { it.id }) { sms ->
-                    BlockedSmsRow(sms = sms, onWhitelist = { onWhitelist(sms) })
+                    BlockedSmsRow(
+                        sms = sms,
+                        isSelected = selectedSmsIds.contains(sms.id),
+                        onWhitelist = { onWhitelist(sms) },
+                        onTap = { if (selectionMode) onToggleSelect(sms) },
+                        onLongPress = { onLongPress(sms) },
+                    )
                 }
+            }
+        }
+    }
+
+    // Batch delete bar
+    if (selectionMode) {
+        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.fillMaxWidth().padding(12.dp).clickable {
+                onDelete(selectedSmsIds.toList())
+                onClearSelection()
+            }) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+                Spacer(Modifier.width(8.dp))
+                Text("Delete ${selectedSmsIds.size} messages", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                if (selectedSmsIds.isNotEmpty()) Text("Done", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BlockedSmsRow(sms: BlockedSms, onWhitelist: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun BlockedSmsRow(sms: BlockedSms, isSelected: Boolean, onWhitelist: () -> Unit, onTap: () -> Unit, onLongPress: () -> Unit) {
+    Row(Modifier.fillMaxWidth()
+        .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+        .padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -1011,6 +1186,10 @@ private fun BlockedSmsRow(sms: BlockedSms, onWhitelist: () -> Unit) {
                     }
                 }
             }
+        }
+        if (isSelected) {
+            Icon(Icons.Default.PersonAdd, contentDescription = "Selected", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(6.dp))
         }
         IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
@@ -1029,6 +1208,7 @@ private fun SettingsTab(
     smsPermissionGranted: Boolean,
     onRequestCallScreeningRole: () -> Unit,
     onRequestSmsPermission: () -> Unit,
+    onExportData: () -> Unit,
     notificationsEnabled: Boolean,
     onNotificationsToggle: (Boolean) -> Unit,
     notificationIconStyle: String,
@@ -1052,80 +1232,86 @@ private fun SettingsTab(
         ) {
             Text("Blocking", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().clickable(enabled = !isRoleHeld, onClick = onRequestCallScreeningRole).padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Block stranger calls",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text(
-                        if (isRoleHeld) "Unknown numbers are silently rejected" else "Call screening role not granted — tap to grant",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isRoleHeld) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    )
+            Column(Modifier.padding(start = 16.dp)) {
+                Row(Modifier.fillMaxWidth().clickable(enabled = !isRoleHeld, onClick = onRequestCallScreeningRole).padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Block stranger calls",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            if (isRoleHeld) "Unknown numbers are silently rejected" else "Call screening role not granted — tap to grant",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isRoleHeld) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    Switch(checked = isBlockingEnabled, onCheckedChange = onToggleBlocking,
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
                 }
-                Switch(checked = isBlockingEnabled, onCheckedChange = onToggleBlocking,
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth().clickable(enabled = !smsPermissionGranted, onClick = onRequestSmsPermission).padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Block stranger SMS",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text(
-                        if (smsPermissionGranted) "Messages from unknown senders are silently blocked" else "SMS permission not granted — tap to grant",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (smsPermissionGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth().clickable(enabled = !smsPermissionGranted, onClick = onRequestSmsPermission).padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Block stranger SMS",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            if (smsPermissionGranted) "Messages from unknown senders are silently blocked" else "SMS permission not granted — tap to grant",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (smsPermissionGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    Switch(checked = smsBlockingEnabled, onCheckedChange = onToggleSmsBlocking,
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
                 }
-                Switch(checked = smsBlockingEnabled, onCheckedChange = onToggleSmsBlocking,
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            Spacer(Modifier.height(4.dp))
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
 
             Text("Notifications", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Block alerts",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text("Show blocked call count in status bar",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.padding(start = 16.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Block alerts",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text("Show blocked call count in status bar",
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsToggle,
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
                 }
-                Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            Spacer(Modifier.height(4.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(Modifier.height(4.dp))
 
-            Text("Notification icon", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-            Text("Choose how the icon appears in the status bar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
+                Text("Notification icon", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                Text("Choose how the icon appears in the status bar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
 
-            Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("shield") }.padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = notificationIconStyle == "shield", onClick = { onIconStyleChange("shield") })
-                Spacer(Modifier.width(4.dp))
-                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(12.dp))
-                Column { Text("Shield", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text("Status bar shows the SB shield icon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("circle_count") }.padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = notificationIconStyle == "circle_count", onClick = { onIconStyleChange("circle_count") })
-                Spacer(Modifier.width(4.dp))
-                Box(Modifier.size(20.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {
-                    Text("N", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White, fontSize = 9.sp))
+                Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("shield") }.padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = notificationIconStyle == "shield", onClick = { onIconStyleChange("shield") })
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Column { Text("Shield", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text("Status bar shows the SB shield icon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-                Spacer(Modifier.width(12.dp))
-                Column { Text("Circle with count", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text("Status bar shows a circle with today's blocked count", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Row(Modifier.fillMaxWidth().clickable { onIconStyleChange("circle_count") }.padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = notificationIconStyle == "circle_count", onClick = { onIconStyleChange("circle_count") })
+                    Spacer(Modifier.width(4.dp))
+                    Box(Modifier.size(20.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {
+                        Text("N", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White, fontSize = 9.sp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column { Text("Circle with count", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text("Status bar shows a circle with today's blocked count", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -1134,35 +1320,53 @@ private fun SettingsTab(
 
             Text("SMS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
-            // Keyword filtering
-            Text("Block by keyword", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-            Text("Block SMS containing any of these words", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-            val keywordContext = LocalContext.current
-            var keywordInput by remember { mutableStateOf("") }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SearchField(
-                    value = keywordInput,
-                    onValueChange = { keywordInput = it },
-                    placeholder = "Add keyword",
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(8.dp))
-                TextButton(onClick = {
-                    if (keywordInput.isBlank()) {
-                        Toast.makeText(keywordContext, "Enter a keyword first", Toast.LENGTH_SHORT).show()
-                    } else {
-                        onAddSmsKeyword(keywordInput)
-                        keywordInput = ""
+            Column(Modifier.padding(start = 16.dp)) {
+                Text("Block by keyword", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                Text("Block SMS containing any of these words", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                val keywordContext = LocalContext.current
+                var keywordInput by remember { mutableStateOf("") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    SearchField(
+                        value = keywordInput,
+                        onValueChange = { keywordInput = it },
+                        placeholder = "Add keyword",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        if (keywordInput.isBlank()) {
+                            Toast.makeText(keywordContext, "Enter a keyword first", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onAddSmsKeyword(keywordInput)
+                            keywordInput = ""
+                        }
+                    }) { Text("Add keyword", color = MaterialTheme.colorScheme.primary) }
+                }
+                smsKeywords.forEach { kw ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(kw, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { onRequestRemoveSmsKeyword(kw) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Remove keyword", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
-                }) { Text("Add keyword", color = MaterialTheme.colorScheme.primary) }
+                }
             }
-            smsKeywords.forEach { kw ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(kw, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { onRequestRemoveSmsKeyword(kw) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove keyword", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
+            Text("Data", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.padding(start = 16.dp)) {
+                Text("Export blocked data", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                Text("Save blocked call history as a CSV file", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onExportData, shape = RoundedCornerShape(10.dp)) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Export CSV")
                 }
             }
 
@@ -1172,12 +1376,14 @@ private fun SettingsTab(
 
             Text("Theme", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
-            listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark").forEach { (mode, label) ->
-                Row(Modifier.fillMaxWidth().clickable { onThemeChange(mode) }.padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = themeMode == mode, onClick = { onThemeChange(mode) })
-                    Spacer(Modifier.width(8.dp))
-                    Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Column(Modifier.padding(start = 16.dp)) {
+                listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark").forEach { (mode, label) ->
+                    Row(Modifier.fillMaxWidth().clickable { onThemeChange(mode) }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = themeMode == mode, onClick = { onThemeChange(mode) })
+                        Spacer(Modifier.width(8.dp))
+                        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
 
@@ -1187,14 +1393,16 @@ private fun SettingsTab(
 
             Text("Updates", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Preview builds", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                    Text("Receive pre-release updates before stable release", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.padding(start = 16.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Preview builds", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text("Receive pre-release updates before stable release", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = previewUpdates, onCheckedChange = onPreviewToggle,
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
                 }
-                Switch(checked = previewUpdates, onCheckedChange = onPreviewToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
 
             Spacer(Modifier.height(24.dp))
@@ -1203,15 +1411,17 @@ private fun SettingsTab(
 
             Text("About", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
-            Surface(shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onAbout)) {
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Stranger Blocker", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
-                        Text("Version info, changelog & updates", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.padding(start = 16.dp)) {
+                Surface(shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onAbout)) {
+                    Row(Modifier.padding(horizontal = 12.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Stranger Blocker", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                            Text("Version info, changelog & updates", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(100.dp))
@@ -1329,9 +1539,13 @@ private fun AboutScreen(
             Spacer(Modifier.weight(1f))
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(16.dp))
+            val aboutContext = LocalContext.current
             Text("github.com/khrlagst/stranger-call-blocker",
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp))
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, textDecoration = TextDecoration.Underline),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp).clickable {
+                    aboutContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/khrlagst/stranger-call-blocker")))
+                })
         }
     }
 }
@@ -1386,20 +1600,122 @@ private fun TabItem(label: String, count: Int, selected: Boolean, onClick: () ->
 
 @Composable
 private fun CardHeader(
-    selectedTab: Tab, blockedCount: Int,
-    onAddToWhitelist: () -> Unit, onExportCsv: () -> Unit, onClearHistory: () -> Unit,
+    selectedTab: Tab,
+    blockedCount: Int,
+    selectedCount: Int,
+    filterFrom: Long?,
+    filterTo: Long?,
+    filterCount: Int,
+    onAddToWhitelist: () -> Unit,
+    onFilterApply: (Long?, Long?) -> Unit,
+    onClearHistory: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Spacer(Modifier.weight(1f))
         when (selectedTab) {
-            Tab.WHITELIST -> IconButton(onClick = onAddToWhitelist) { Icon(Icons.Default.Add, contentDescription = "Add to whitelist", tint = MaterialTheme.colorScheme.primary) }
-            Tab.BLOCKED -> if (blockedCount > 0) {
-                IconButton(onClick = onExportCsv) { Icon(Icons.Default.FileDownload, contentDescription = "Export blocked calls", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick = onClearHistory) { Icon(Icons.Default.ClearAll, contentDescription = "Clear blocked history", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Tab.WHITELIST -> {
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onAddToWhitelist) { Icon(Icons.Default.Add, contentDescription = "Add to whitelist", tint = MaterialTheme.colorScheme.primary) }
+            }
+            Tab.BLOCKED -> {
+                if (selectedCount > 0) {
+                    Text("$selectedCount selected", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                if (blockedCount > 0) {
+                    DateRangeFilterButton(from = filterFrom, to = filterTo, count = filterCount, onApply = onFilterApply)
+                    IconButton(onClick = onClearHistory) { Icon(Icons.Default.ClearAll, contentDescription = "Clear blocked history", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateRangeFilterButton(from: Long?, to: Long?, count: Int, onApply: (Long?, Long?) -> Unit) {
+    var showPopup by remember { mutableStateOf(false) }
+    var pendingFrom by remember { mutableStateOf<Long?>(null) }
+    var pendingTo by remember { mutableStateOf<Long?>(null) }
+    var pickerTarget by remember { mutableStateOf<Boolean?>(null) }
+    val active = from != null || to != null
+
+    Box {
+        IconButton(onClick = {
+            pendingFrom = from
+            pendingTo = to
+            showPopup = true
+        }) {
+            Icon(Icons.Default.FilterList, contentDescription = "Filter by date",
+                tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (active && count > 0) {
+            Box(Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp).size(16.dp).clip(CircleShape)
+                .background(Color(0xFFDC2626)), contentAlignment = Alignment.Center) {
+                Text("$count", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold), color = Color.White)
+            }
+        }
+        if (showPopup) {
+            val filterOffset = with(LocalDensity.current) { IntOffset(0, 8.dp.toPx().toInt()) }
+            Popup(alignment = Alignment.TopEnd, offset = filterOffset, onDismissRequest = { showPopup = false }) {
+                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 6.dp, shadowElevation = 8.dp) {
+                    Column(Modifier.width(190.dp).padding(vertical = 8.dp)) {
+                        Text("Filter by date", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp))
+                        Row(Modifier.fillMaxWidth().clickable { pickerTarget = true }.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("From", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                            Text(fmtFilterDate(pendingFrom), style = MaterialTheme.typography.labelMedium)
+                        }
+                        Row(Modifier.fillMaxWidth().clickable { pickerTarget = false }.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("To", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                            Text(fmtFilterDate(pendingTo), style = MaterialTheme.typography.labelMedium)
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { pendingFrom = null; pendingTo = null }) { Text("Clear", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            TextButton(onClick = { onApply(pendingFrom, pendingTo); showPopup = false }) { Text("Confirm", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
+                        }
+                    }
+                }
+            }
+        }
+        pickerTarget?.let { isFrom ->
+            val state = rememberDatePickerState(initialSelectedDateMillis = if (isFrom) pendingFrom else pendingTo)
+            DatePickerDialog(
+                onDismissRequest = { pickerTarget = null },
+                confirmButton = {
+                    TextButton(onClick = {
+                        state.selectedDateMillis?.let { sel ->
+                            val dayStart = localDayStartMillis(sel)
+                            if (isFrom) pendingFrom = dayStart else pendingTo = dayStart + 86_399_999L
+                        }
+                        pickerTarget = null
+                    }) { Text("OK") }
+                },
+                dismissButton = { TextButton(onClick = { pickerTarget = null }) { Text("Cancel") } },
+            ) {
+                DatePicker(state = state)
+            }
+        }
+    }
+}
+
+private fun fmtFilterDate(millis: Long?): String =
+    if (millis == null) "Any" else SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(millis))
+
+private fun localDayStartMillis(utcMidnight: Long): Long {
+    val cal = Calendar.getInstance()
+    cal.timeInMillis = utcMidnight
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
 }
 
 // ── Whitelist Content ──
@@ -1428,12 +1744,19 @@ private fun WhitelistContent(entries: List<WhitelistedNumber>, onRemove: (Whitel
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -> Unit, onDelete: (List<Long>) -> Unit) {
+private fun BlockedContent(
+    groups: List<CallGroup>,
+    onWhitelist: (BlockedCall) -> Unit,
+    selectedIds: Set<Long>,
+    selectionMode: Boolean,
+    onToggleSelect: (BlockedCall) -> Unit,
+    onLongPress: (BlockedCall) -> Unit,
+    onClearSelection: () -> Unit,
+    onDelete: (List<Long>) -> Unit,
+) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var selectedCall by remember { mutableStateOf<BlockedCall?>(null) }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val sheetState = rememberModalBottomSheetState()
 
     if (groups.isEmpty()) {
@@ -1464,16 +1787,9 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
                             isSelected = isSelected,
                             onWhitelist = { onWhitelist(first) },
                             onTap = {
-                                if (selectionMode) {
-                                    selectedIds = if (isSelected) selectedIds - first.id else selectedIds + first.id
-                                } else {
-                                    selectedCall = first
-                                }
+                                if (selectionMode) onToggleSelect(first) else selectedCall = first
                             },
-                            onLongPress = {
-                                selectionMode = true
-                                selectedIds = selectedIds + first.id
-                            },
+                            onLongPress = { onLongPress(first) },
                         )
                     }
                 }
@@ -1486,8 +1802,7 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
         Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer,
             modifier = Modifier.fillMaxWidth().padding(12.dp).clickable {
                 onDelete(selectedIds.toList())
-                selectedIds = emptySet()
-                selectionMode = false
+                onClearSelection()
             }) {
             Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
@@ -1500,7 +1815,7 @@ private fun BlockedContent(groups: List<CallGroup>, onWhitelist: (BlockedCall) -
 
     if (selectedCall != null) {
         val call = selectedCall!!
-        ModalBottomSheet(onDismissRequest = { selectedCall = null }, sheetState = sheetState) {
+        ModalBottomSheet(onDismissRequest = { selectedCall = null }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surfaceVariant) {
             Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
                 Text(call.phoneNumber, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
@@ -1667,11 +1982,12 @@ private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolea
 private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (String) -> Unit, onLabelChange: (String) -> Unit, onAdd: (String, String) -> Unit, onDismiss: () -> Unit, onPickContact: () -> Unit, onPickRecent: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = { Text("Add to whitelist", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = number, onValueChange = onNumberChange, label = { Text("Phone number") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = label, onValueChange = onLabelChange, label = { Text("Label (optional)") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                SearchField(value = number, onValueChange = onNumberChange, placeholder = "Phone number", modifier = Modifier.fillMaxWidth())
+                SearchField(value = label, onValueChange = onLabelChange, placeholder = "Label (optional)", modifier = Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onPickContact, shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)) {
                         Text("From contacts", fontSize = 12.sp)
@@ -1695,14 +2011,14 @@ private fun AddWhitelistDialog(number: String, label: String, onNumberChange: (S
 private fun ManualBlockDialog(input: String, onInputChange: (String) -> Unit, onSave: (String) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = { Text("Manual block", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary) },
         text = {
             Column {
                 Text("Block these numbers for calls and SMS — separate multiple numbers with commas",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = input, onValueChange = onInputChange,
-                    placeholder = { Text("Enter number(s)") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                SearchField(value = input, onValueChange = onInputChange, placeholder = "Enter number(s)", modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -1718,6 +2034,7 @@ private fun ManualBlockDialog(input: String, onInputChange: (String) -> Unit, on
 private fun UpdateConfirmDialog(version: String, releaseNotes: String, isPreview: Boolean, downloading: Boolean, onCancel: () -> Unit, onUpdate: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Update to v$version")
@@ -1744,11 +2061,12 @@ private fun UpdateConfirmDialog(version: String, releaseNotes: String, isPreview
 }
 
 @Composable
-private fun ClearHistoryDialog(total: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun ClearHistoryDialog(total: Int, noun: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = { Text("Clear blocked history?") },
-        text = { Text("This will permanently delete all $total blocked call records. No undo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        text = { Text("This will permanently delete all $total $noun. No undo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         confirmButton = { TextButton(onClick = onConfirm) { Text("Clear All", color = Color(0xFFDC2626)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
@@ -1777,9 +2095,9 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "SMS search bar, keyword validation and delete confirmation",
-    "Status banner covers both calls and SMS blocking",
-    "FAB bubble menu, About screen fix, Today counter fix",
+    "Date-range filters and batch-select counts on blocked lists",
+    "Settings: Data section with CSV export, indented sections",
+    "Symmetric app icon, whitelist confirmations, state reset",
 )
 
 

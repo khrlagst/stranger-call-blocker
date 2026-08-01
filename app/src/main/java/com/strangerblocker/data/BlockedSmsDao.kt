@@ -17,6 +17,9 @@ interface BlockedSmsDao {
     @Query("DELETE FROM blocked_sms")
     suspend fun clearAll()
 
+    @Query("DELETE FROM blocked_sms WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     @Query("DELETE FROM blocked_sms WHERE blockedAtMillis < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long)
 

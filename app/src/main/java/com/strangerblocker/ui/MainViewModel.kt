@@ -140,14 +140,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSearchQuery(query: String) { searchQuery.value = query }
 
-    /** Blocked calls filtered by [searchQuery] (matches phone number substring). */
-    val filteredGroupedCalls: StateFlow<List<CallGroup>> = combine(groupedCalls, searchQuery) { groups, query ->
-        if (query.isBlank()) groups
+    // ── Call date-range filter ──
+
+    val callFilterFrom = MutableStateFlow<Long?>(null)
+    val callFilterTo = MutableStateFlow<Long?>(null)
+
+    /** Blocked calls filtered by [searchQuery] and the [callFilterFrom]/[callFilterTo] date range. */
+    val filteredGroupedCalls: StateFlow<List<CallGroup>> = combine(groupedCalls, searchQuery, callFilterFrom, callFilterTo) { groups, query, from, to ->
+        if (query.isBlank() && from == null && to == null) groups
         else groups.mapNotNull { group ->
-            val matched = group.calls.filter { it.phoneNumber.contains(query, ignoreCase = true) }
+            val matched = group.calls.filter {
+                (query.isBlank() || it.phoneNumber.contains(query, ignoreCase = true)) &&
+                    inRange(it.blockedAtMillis, from, to)
+            }
             if (matched.isEmpty()) null else CallGroup(group.header, matched)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Number of blocked calls matching the date-range filter (0 when no filter active). */
+    val callFilterCount: StateFlow<Int> = combine(groupedCalls, callFilterFrom, callFilterTo) { groups, from, to ->
+        if (from == null && to == null) 0
+        else groups.sumOf { g -> g.calls.count { inRange(it.blockedAtMillis, from, to) } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     // ── Whitelist ──
 
@@ -253,23 +267,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val totalSmsBlocked: StateFlow<Int> = blockedSms.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    // ── SMS search ──
+    // ── SMS search & date-range filter ──
 
     val smsSearchQuery = MutableStateFlow("")
 
     fun setSmsSearchQuery(query: String) { smsSearchQuery.value = query }
 
-    /** Blocked SMS filtered by [smsSearchQuery] (matches sender number or message body). */
-    val filteredGroupedSms: StateFlow<List<SmsGroup>> = combine(groupedBlockedSms, smsSearchQuery) { groups, query ->
-        if (query.isBlank()) groups
+    val smsFilterFrom = MutableStateFlow<Long?>(null)
+    val smsFilterTo = MutableStateFlow<Long?>(null)
+
+    /** Blocked SMS filtered by [smsSearchQuery] and the [smsFilterFrom]/[smsFilterTo] date range. */
+    val filteredGroupedSms: StateFlow<List<SmsGroup>> = combine(groupedBlockedSms, smsSearchQuery, smsFilterFrom, smsFilterTo) { groups, query, from, to ->
+        if (query.isBlank() && from == null && to == null) groups
         else groups.mapNotNull { group ->
             val matched = group.smsList.filter {
-                it.senderNumber.contains(query, ignoreCase = true) ||
-                    it.messageBody.contains(query, ignoreCase = true)
+                (query.isBlank() || it.senderNumber.contains(query, ignoreCase = true) || it.messageBody.contains(query, ignoreCase = true)) &&
+                    inRange(it.blockedAtMillis, from, to)
             }
             if (matched.isEmpty()) null else SmsGroup(group.header, matched)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Number of blocked SMS matching the date-range filter (0 when no filter active). */
+    val smsFilterCount: StateFlow<Int> = combine(groupedBlockedSms, smsFilterFrom, smsFilterTo) { groups, from, to ->
+        if (from == null && to == null) 0
+        else groups.sumOf { g -> g.smsList.count { inRange(it.blockedAtMillis, from, to) } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     /** Whitelist filtered by [smsSearchQuery] (matches number or label substring). */
     val filteredWhitelistedSms: StateFlow<List<WhitelistedNumber>> = combine(whitelisted, smsSearchQuery) { list, query ->
@@ -304,6 +327,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleSmsBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("sms_blocking_enabled", enabled).apply()
         _smsBlockingEnabled.value = enabled
+    }
+
+    fun deleteBlockedSmsByIds(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch { db.blockedSmsDao().deleteByIds(ids) }
     }
 
     // ── SMS keyword filtering ──
@@ -342,6 +370,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cancelRemoveSmsKeyword() {
+        _pendingKeywordRemoval.value = null
+    }
+
+    // ── UI state reset (on app reopen) ──
+
+    fun resetUiState() {
+        bottomNavTab.value = BottomNavTab.DASHBOARD
+        selectedTab.value = Tab.BLOCKED
+        searchQuery.value = ""
+        smsSearchQuery.value = ""
+        callFilterFrom.value = null
+        callFilterTo.value = null
+        smsFilterFrom.value = null
+        smsFilterTo.value = null
+        showAbout.value = false
+        showUpdateDialog.value = false
+        showAddWhitelistDialog.value = false
+        showClearHistoryDialog.value = false
+        showClearSmsHistoryDialog.value = false
+        showManualBlockDialog.value = false
+        manualBlockInput.value = ""
+        whitelistInputNumber.value = ""
+        whitelistInputLabel.value = ""
+        _pendingManualBlocks.value = emptyList()
+        _pendingWhitelistConfirm.value = null
+        _pendingWhitelistRemoval.value = null
         _pendingKeywordRemoval.value = null
     }
 
@@ -694,6 +748,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         showClearHistoryDialog.value = false
     }
 
+    val showClearSmsHistoryDialog = MutableStateFlow(false)
+
+    fun openClearSmsHistoryDialog() { showClearSmsHistoryDialog.value = true }
+    fun closeClearSmsHistoryDialog() { showClearSmsHistoryDialog.value = false }
+
+    fun confirmClearSmsHistory() {
+        viewModelScope.launch { db.blockedSmsDao().clearAll() }
+        showClearSmsHistoryDialog.value = false
+    }
+
     fun deleteBlockedByIds(ids: List<Long>) {
         if (ids.isEmpty()) return
         viewModelScope.launch { db.blockedCallDao().deleteByIds(ids) }
@@ -765,3 +829,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         maybePostNotification()
     }
 }
+
+private fun inRange(millis: Long, from: Long?, to: Long?): Boolean =
+    (from == null || millis >= from) && (to == null || millis <= to)
