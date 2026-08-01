@@ -4,6 +4,7 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -154,6 +155,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val smsBlockingEnabled by viewModel.smsBlockingEnabled.collectAsState()
     val smsKeywords by viewModel.smsKeywords.collectAsState()
     val smsSearchQuery by viewModel.smsSearchQuery.collectAsState()
+    val smsNotificationAccessGranted by viewModel.smsNotificationAccessGranted.collectAsState()
     val groupedBlockedSms by viewModel.groupedBlockedSms.collectAsState()
     val filteredGroupedSms by viewModel.filteredGroupedSms.collectAsState()
     val filteredWhitelistedSms by viewModel.filteredWhitelistedSms.collectAsState()
@@ -493,6 +495,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             pendingSmsPermissionEnable = false
                             smsPermissionLauncher.launch(android.Manifest.permission.RECEIVE_SMS)
                         },
+                        smsNotificationAccessGranted = smsNotificationAccessGranted,
+                        onRequestSmsNotificationAccess = {
+                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        },
                         onExportData = { saveCsvLauncher.launch("blocked_calls.csv") },
                         notificationsEnabled = notificationsEnabled,
                         onNotificationsToggle = viewModel::toggleNotifications,
@@ -526,6 +532,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     if (tab == BottomNavTab.SETTINGS) {
                         viewModel.refreshRoleStatus()
                         smsPermissionGranted = checkSmsPermission(context)
+                        viewModel.refreshSmsNotificationAccess()
                     }
                 },
             )
@@ -1202,8 +1209,10 @@ private fun SettingsTab(
     onToggleSmsBlocking: (Boolean) -> Unit,
     isRoleHeld: Boolean,
     smsPermissionGranted: Boolean,
+    smsNotificationAccessGranted: Boolean,
     onRequestCallScreeningRole: () -> Unit,
     onRequestSmsPermission: () -> Unit,
+    onRequestSmsNotificationAccess: () -> Unit,
     onExportData: () -> Unit,
     notificationsEnabled: Boolean,
     onNotificationsToggle: (Boolean) -> Unit,
@@ -1260,6 +1269,21 @@ private fun SettingsTab(
                     Switch(checked = smsBlockingEnabled, onCheckedChange = onToggleSmsBlocking,
                         colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                             uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth().clickable(enabled = !smsNotificationAccessGranted, onClick = onRequestSmsNotificationAccess).padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Dismiss SMS notifications",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            if (smsNotificationAccessGranted) "Blocked SMS notifications are cleared automatically"
+                            else "Required on Android 11+ — tap to enable notification access",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (smsNotificationAccessGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
 
@@ -2096,40 +2120,10 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "## Features",
-    "SMS blocking — unknown senders intercepted via broadcast, with a notification fallback on Android 11+",
-    "SMS keyword blocking with per-message reason labels",
-    "Blocked SMS previews — sender, message snippet, per-item whitelist",
-    "Search on both the Calls and SMS blocked lists",
-    "Attempt-count badges and tap-for-actions on blocked calls",
-    "Batch select & delete for blocked calls and SMS, with live count",
-    "Manual block (multiple numbers at once) and whitelist from contacts or recent calls",
-    "Quick whitelist with confirmation dialog and duplicate detection",
-    "Pause/resume blocking with live countdown in the top bar",
-    "Floating action button — manual block and whitelist quick actions",
-    "Dashboard: recent activity, calls & SMS weekly summary, 7-day dual-channel chart",
-    "Status banner showing effective blocking for calls and/or SMS",
-    "Settings: permission-aware blocking toggles with one-tap permission grant",
-    "Date-range filters on blocked lists with matching-count badge",
-    "CSV export from Settings → Data",
-    "Dark mode with light/dark/system themes",
-    "OTA updates — stable and preview channels with in-app install",
-    "## Enhancements",
-    "Blocked-first tabs with search inside the card",
-    "Compact search field reused across all inputs; uniform overlay tint",
-    "Settings sections indented for clearer navigation; tappable repo link on About",
-    "Redesigned dashboard with shared header and baseline-grounded weekly chart",
-    "Notification count now always accurate",
-    "Privacy hardening — cloud backup disabled, update files scoped to a private folder",
-    "Symmetric app icon",
     "## Fixes",
-    "Blocked-calls Today counter no longer shows the previous day's count",
-    "Update dialog now overlays About instead of dropping back to Settings",
-    "SMS blocking no longer active before it is first enabled",
-    "Version comparison for preview builds",
-    "Dark-mode contrast and background consistency",
-    "SMS receiver reliability on Android 11+",
-    "Multiple compile fixes across the preview line",
+    "SMS blocking on Android 11+ — blocked SMS notifications are now dismissed automatically",
+    "New Settings entry to enable notification access for the SMS fallback",
+    "Precise notification dismissal via a blocked-sender registry",
 )
 
 

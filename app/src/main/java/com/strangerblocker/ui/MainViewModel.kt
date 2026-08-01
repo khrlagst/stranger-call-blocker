@@ -334,6 +334,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { db.blockedSmsDao().deleteByIds(ids) }
     }
 
+    // ── SMS notification access (Android 11+ fallback) ──
+
+    private val _smsNotificationAccessGranted = MutableStateFlow(false)
+    val smsNotificationAccessGranted: StateFlow<Boolean> = _smsNotificationAccessGranted.asStateFlow()
+
+    fun refreshSmsNotificationAccess() {
+        val app = getApplication<Application>()
+        _smsNotificationAccessGranted.value =
+            NotificationManagerCompat.getEnabledListenerPackages(app).contains(app.packageName)
+    }
+
     // ── SMS keyword filtering ──
 
     private val _smsKeywords = MutableStateFlow(
@@ -822,6 +833,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         prefs.registerOnSharedPreferenceChangeListener(prefListener)
+        refreshSmsNotificationAccess()
         viewModelScope.launch {
             val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
             db.blockedCallDao().deleteOlderThan(thirtyDaysAgo)

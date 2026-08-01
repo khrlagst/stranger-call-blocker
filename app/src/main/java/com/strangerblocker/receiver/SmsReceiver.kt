@@ -3,6 +3,7 @@ package com.strangerblocker.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.provider.Telephony
 import android.telephony.SmsMessage
 import com.strangerblocker.StrangerBlockerApp
@@ -54,6 +55,10 @@ class SmsReceiver : BroadcastReceiver() {
             // Abort the broadcast NOW — synchronously inside onReceive().
             abortBroadcast()
 
+            // Record the blocked sender so the notification listener can
+            // dismiss this message's notification (Android 11+ fallback).
+            recordBlockedSender(prefs, sender)
+
             // Persist to DB in the background AFTER abort.
             scope.launch {
                 try {
@@ -83,5 +88,17 @@ class SmsReceiver : BroadcastReceiver() {
         } catch (_: Exception) {
             false
         }
+    }
+
+    /** Remember a blocked sender (with timestamp) so the notification listener can dismiss its notification. */
+    private fun recordBlockedSender(prefs: SharedPreferences, sender: String) {
+        val now = System.currentTimeMillis()
+        val cutoff = now - 10 * 60_000
+        val updated = (prefs.getStringSet("recent_blocked_sms_senders", emptySet()) ?: emptySet())
+            .filterTo(mutableSetOf()) {
+                (it.substringAfterLast('|').toLongOrNull() ?: 0L) > cutoff
+            }
+        updated.add("$sender|$now")
+        prefs.edit().putStringSet("recent_blocked_sms_senders", updated).apply()
     }
 }
