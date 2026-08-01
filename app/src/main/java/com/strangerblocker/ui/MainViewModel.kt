@@ -253,6 +253,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val totalSmsBlocked: StateFlow<Int> = blockedSms.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    // ── SMS search ──
+
+    val smsSearchQuery = MutableStateFlow("")
+
+    fun setSmsSearchQuery(query: String) { smsSearchQuery.value = query }
+
+    /** Blocked SMS filtered by [smsSearchQuery] (matches sender number or message body). */
+    val filteredGroupedSms: StateFlow<List<SmsGroup>> = combine(groupedBlockedSms, smsSearchQuery) { groups, query ->
+        if (query.isBlank()) groups
+        else groups.mapNotNull { group ->
+            val matched = group.smsList.filter {
+                it.senderNumber.contains(query, ignoreCase = true) ||
+                    it.messageBody.contains(query, ignoreCase = true)
+            }
+            if (matched.isEmpty()) null else SmsGroup(group.header, matched)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Whitelist filtered by [smsSearchQuery] (matches number or label substring). */
+    val filteredWhitelistedSms: StateFlow<List<WhitelistedNumber>> = combine(whitelisted, smsSearchQuery) { list, query ->
+        if (query.isBlank()) list
+        else list.filter {
+            it.phoneNumber.contains(query, ignoreCase = true) ||
+                (it.label?.contains(query, ignoreCase = true) == true)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     /** Daily SMS counts for the last 7 days — 0=Monday .. 6=Sunday. */
     val weeklySmsCounts: StateFlow<List<Int>> = blockedSms.map { smsList ->
         val cal = Calendar.getInstance()
@@ -298,6 +325,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updated = _smsKeywords.value - keyword
         prefs.edit().putStringSet("sms_keywords", updated.toSet()).apply()
         _smsKeywords.value = updated
+    }
+
+    // ── SMS keyword removal confirm ──
+
+    private val _pendingKeywordRemoval = MutableStateFlow<String?>(null)
+    val pendingKeywordRemoval: StateFlow<String?> = _pendingKeywordRemoval.asStateFlow()
+
+    fun requestRemoveSmsKeyword(keyword: String) {
+        _pendingKeywordRemoval.value = keyword
+    }
+
+    fun confirmRemoveSmsKeyword() {
+        _pendingKeywordRemoval.value?.let { removeSmsKeyword(it) }
+        _pendingKeywordRemoval.value = null
+    }
+
+    fun cancelRemoveSmsKeyword() {
+        _pendingKeywordRemoval.value = null
     }
 
     // ── Toggle ──
