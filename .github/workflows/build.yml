@@ -10,6 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CI_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      CI_KEY_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
+      CI_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
     permissions:
       contents: write
 
@@ -52,10 +56,6 @@ jobs:
           echo "$KEYSTORE_B64" | base64 --decode > ci.keystore
 
       - name: Build debug + release APKs
-        env:
-          CI_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          CI_KEY_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
-          CI_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: ./gradlew assembleDebug assembleRelease
 
       - name: Upload debug APK
