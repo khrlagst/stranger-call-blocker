@@ -22,7 +22,7 @@ class StrangerBlockerApp : Application() {
             "Block alerts",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Shows how many calls were blocked today"
+            description = "Shows how many calls and SMS were blocked today"
             setShowBadge(true)
         }
         val nm = getSystemService(NotificationManager::class.java)

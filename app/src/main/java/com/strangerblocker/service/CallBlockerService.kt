@@ -54,6 +54,35 @@ class CallBlockerService : CallScreeningService() {
             return
         }
 
+        // VoIP/unknown handle (e.g. "WhatsApp Call" without a number) — number
+        // rules can't apply, so the user decides via the "messaging apps" toggle.
+        if (!isPhoneNumberShape(phoneNumber)) {
+            if (blockVoipCalls()) {
+                respondToCall(
+                    details,
+                    CallScreeningService.CallResponse.Builder()
+                        .setDisallowCall(true)
+                        .setRejectCall(true)
+                        .setSkipCallLog(false)
+                        .setSkipNotification(false)
+                        .build(),
+                )
+                scope.launch {
+                    val app = applicationContext as StrangerBlockerApp
+                    app.db.blockedCallDao().insert(
+                        BlockedCall(
+                            phoneNumber = phoneNumber,
+                            blockedAtMillis = System.currentTimeMillis(),
+                        )
+                    )
+                    postBlockedNotification(app)
+                }
+            } else {
+                respondToCall(details, CallScreeningService.CallResponse.Builder().build())
+            }
+            return
+        }
+
         // Whitelist check first (fastest path)
         if (isWhitelisted(phoneNumber)) {
             respondToCall(details, CallScreeningService.CallResponse.Builder().build())
@@ -124,6 +153,17 @@ class CallBlockerService : CallScreeningService() {
         return prefs.getLong("blocking_paused_until", 0L) > System.currentTimeMillis()
     }
 
+    /** True when the handle carries an actual phone number (7–15 digits). */
+    private fun isPhoneNumberShape(number: String): Boolean {
+        val digits = number.count { it.isDigit() }
+        return digits in 7..15
+    }
+
+    private fun blockVoipCalls(): Boolean {
+        val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
+        return prefs.getBoolean("block_voip_calls", false)
+    }
+
     private fun isManuallyBlocked(number: String): Boolean {
         val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
         return prefs.getStringSet("manual_blocks", emptySet())?.contains(number) == true
@@ -172,7 +212,7 @@ class CallBlockerService : CallScreeningService() {
             // inserted, so dbCount already includes it — no extra increment.
             val todayStart = todayStartMillis()
             val dbCount = runBlocking(Dispatchers.IO) {
-                app.db.blockedCallDao().countSince(todayStart)
+                app.db.blockedCallDao().countSince(todayStart) + app.db.blockedSmsDao().countSince(todayStart)
             }
             prefs.edit().putInt(todayKey, dbCount).apply()
             count = dbCount

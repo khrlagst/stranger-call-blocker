@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
@@ -143,6 +144,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val totalBlocked by viewModel.totalBlocked.collectAsState()
     val recentBlocked by viewModel.recentBlocked.collectAsState()
     val whitelisted by viewModel.whitelisted.collectAsState(initial = emptyList())
+    val numberLabels by viewModel.numberLabels.collectAsState(initial = emptyList())
+    val patterns by viewModel.patterns.collectAsState()
+    val pendingLabelNumber by viewModel.pendingLabelNumber.collectAsState()
     val filteredGroupedCalls by viewModel.filteredGroupedCalls.collectAsState()
     val filteredWhitelisted by viewModel.filteredWhitelisted.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -156,6 +160,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val smsKeywords by viewModel.smsKeywords.collectAsState()
     val smsSearchQuery by viewModel.smsSearchQuery.collectAsState()
     val smsNotificationAccessGranted by viewModel.smsNotificationAccessGranted.collectAsState()
+    val blockVoipCalls by viewModel.blockVoipCalls.collectAsState()
+    val silenceMessagingApps by viewModel.silenceMessagingApps.collectAsState()
     val groupedBlockedSms by viewModel.groupedBlockedSms.collectAsState()
     val filteredGroupedSms by viewModel.filteredGroupedSms.collectAsState()
     val filteredWhitelistedSms by viewModel.filteredWhitelistedSms.collectAsState()
@@ -185,6 +191,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val pendingWhitelistConfirm by viewModel.pendingWhitelistConfirm.collectAsState()
     val pendingKeywordRemoval by viewModel.pendingKeywordRemoval.collectAsState()
     val context = LocalContext.current
+    val labelsMap = numberLabels.associate {
+        it.phoneNumber to (SpamLabel.entries.firstOrNull { l -> l.name == it.label }?.display ?: it.label)
+    }
 
     // Live clock so the pause countdown ("59'") ticks down in the header.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -431,6 +440,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             }
                         },
                         onDeleteBlocked = viewModel::deleteBlockedByIds,
+                        labels = labelsMap,
+                        patterns = patterns,
+                        onReportSpam = { viewModel.requestLabelNumber(it.phoneNumber) },
                     )
                     BottomNavTab.SMS -> SmsScreen(
                         filteredGroupedSms = filteredGroupedSms,
@@ -459,6 +471,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         },
                         onDeleteBlockedSms = viewModel::deleteBlockedSmsByIds,
                         onClearHistory = viewModel::openClearSmsHistoryDialog,
+                        labels = labelsMap,
+                        patterns = patterns,
+                        onReportSpam = { viewModel.requestLabelNumber(it.senderNumber) },
                     )
                     BottomNavTab.SETTINGS -> SettingsTab(
                         isBlockingEnabled = isBlockingEnabled,
@@ -499,7 +514,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onRequestSmsNotificationAccess = {
                             context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         },
+                        blockVoipCalls = blockVoipCalls,
+                        onToggleBlockVoipCalls = viewModel::toggleBlockVoipCalls,
+                        silenceMessagingApps = silenceMessagingApps,
+                        onToggleSilenceMessagingApps = viewModel::toggleSilenceMessagingApps,
                         onExportData = { saveCsvLauncher.launch("blocked_calls.csv") },
+                        patterns = patterns,
+                        onDismissPattern = viewModel::dismissPattern,
                         notificationsEnabled = notificationsEnabled,
                         onNotificationsToggle = viewModel::toggleNotifications,
                         notificationIconStyle = notificationIconStyle,
@@ -682,6 +703,32 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             dismissButton = { TextButton(onClick = viewModel::cancelRemoveSmsKeyword) { Text("Cancel") } },
         )
     }
+    if (pendingLabelNumber != null) {
+        val number = pendingLabelNumber!!
+        AlertDialog(
+            onDismissRequest = viewModel::cancelLabelNumber,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Report as spam", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary) },
+            text = {
+                Column {
+                    Text("Label this number to remember why it was blocked:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    SpamLabel.entries.forEach { label ->
+                        Row(Modifier.fillMaxWidth().clickable {
+                            viewModel.setNumberLabel(number, label)
+                            Toast.makeText(context, "Labeled as ${label.display}", Toast.LENGTH_SHORT).show()
+                        }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(10.dp))
+                            Text(label.display, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = viewModel::cancelLabelNumber) { Text("Cancel") } },
+        )
+    }
 }
 
 // ── Bottom Navigation Bar ──
@@ -730,6 +777,7 @@ private fun DashboardScreen(
     val thisWeekCount = groupedCalls.takeWhile { it.header != "Earlier" }.sumOf { it.calls.size }
     val todaySmsCount = groupedBlockedSms.firstOrNull { it.header == "Today" }?.smsList?.size ?: 0
     val smsThisWeekCount = groupedBlockedSms.takeWhile { it.header != "Earlier" }.sumOf { it.smsList.size }
+    val totalTodayCount = todayCount + todaySmsCount
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -747,7 +795,7 @@ private fun DashboardScreen(
                 Text("Total Blocked Today",
                     style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
-                Text("$todayCount",
+                Text("$totalTodayCount",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(4.dp))
                 Text("Calls: $todayCount · SMS: $todaySmsCount",
@@ -823,7 +871,7 @@ private fun DashboardScreen(
                     val dayNames = listOf("M", "T", "W", "T", "F", "S", "S")
                     val maxVal = maxOf(weeklyCounts.max(), weeklySmsCounts.max()).coerceAtLeast(1)
                     // Baseline at bottom: bars grow UPWARD, calls + SMS side by side per day
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
                         weeklyCounts.forEachIndexed { i, count ->
                             val smsCount = weeklySmsCounts[i]
                             val callsBarHeight = (count.toFloat() / maxVal * 96f).toInt().coerceAtLeast(if (count > 0) 4 else 0)
@@ -842,7 +890,6 @@ private fun DashboardScreen(
                                                 .background(MaterialTheme.colorScheme.primary),
                                         )
                                     }
-                                    Spacer(Modifier.width(3.dp))
                                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                                         Text("$smsCount",
                                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -917,6 +964,9 @@ private fun CallsContent(
     onRemoveWhitelist: (WhitelistedNumber) -> Unit,
     onWhitelistCall: (BlockedCall) -> Unit,
     onDeleteBlocked: (List<Long>) -> Unit,
+    labels: Map<String, String>,
+    patterns: List<BlockPattern>,
+    onReportSpam: (BlockedCall) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -992,6 +1042,9 @@ private fun CallsContent(
                                     selectedIds = emptySet()
                                     selectionMode = false
                                 },
+                                labels = labels,
+                                patterns = patterns,
+                                onReportSpam = onReportSpam,
                             )
                             1 -> WhitelistContent(entries = filteredWhitelisted, onRemove = onRemoveWhitelist)
                         }
@@ -1023,6 +1076,9 @@ private fun SmsScreen(
     onWhitelistSms: (BlockedSms) -> Unit,
     onDeleteBlockedSms: (List<Long>) -> Unit,
     onClearHistory: () -> Unit,
+    labels: Map<String, String>,
+    patterns: List<BlockPattern>,
+    onReportSpam: (BlockedSms) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -1098,6 +1154,9 @@ private fun SmsScreen(
                                     selectedSmsIds = emptySet()
                                     smsSelectionMode = false
                                 },
+                                labels = labels,
+                                patterns = patterns,
+                                onReportSpam = onReportSpam,
                             )
                             1 -> WhitelistContent(entries = filteredWhitelistedSms, onRemove = onRemoveWhitelist)
                         }
@@ -1119,6 +1178,9 @@ private fun SmsBlockedContent(
     onClearSelection: () -> Unit,
     onWhitelist: (BlockedSms) -> Unit,
     onDelete: (List<Long>) -> Unit,
+    labels: Map<String, String>,
+    patterns: List<BlockPattern>,
+    onReportSpam: (BlockedSms) -> Unit,
 ) {
     if (groups.isEmpty() || groups.all { it.smsList.isEmpty() }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1139,10 +1201,14 @@ private fun SmsBlockedContent(
                     }
                 }
                 items(group.smsList, key = { it.id }) { sms ->
+                    val tag = labels[sms.senderNumber]
+                        ?: (if (patterns.any { sms.senderNumber.startsWith(it.prefix) }) "Pattern" else null)
                     BlockedSmsRow(
                         sms = sms,
                         isSelected = selectedSmsIds.contains(sms.id),
+                        tag = tag,
                         onWhitelist = { onWhitelist(sms) },
+                        onReport = { onReportSpam(sms) },
                         onTap = { if (selectionMode) onToggleSelect(sms) },
                         onLongPress = { onLongPress(sms) },
                     )
@@ -1170,14 +1236,23 @@ private fun SmsBlockedContent(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BlockedSmsRow(sms: BlockedSms, isSelected: Boolean, onWhitelist: () -> Unit, onTap: () -> Unit, onLongPress: () -> Unit) {
+private fun BlockedSmsRow(sms: BlockedSms, isSelected: Boolean, tag: String?, onWhitelist: () -> Unit, onReport: () -> Unit, onTap: () -> Unit, onLongPress: () -> Unit) {
     Row(Modifier.fillMaxWidth()
         .combinedClickable(onClick = onTap, onLongClick = onLongPress)
         .padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(sms.senderNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(sms.senderNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (tag != null) {
+                    Spacer(Modifier.width(6.dp))
+                    Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFFFF3E0)) {
+                        Text(tag, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                            color = Color(0xFFB45309), modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                    }
+                }
+            }
             Text(sms.messageBody, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1194,6 +1269,7 @@ private fun BlockedSmsRow(sms: BlockedSms, isSelected: Boolean, onWhitelist: () 
             Icon(Icons.Default.PersonAdd, contentDescription = "Selected", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(6.dp))
         }
+        IconButton(onClick = onReport) { Icon(Icons.Default.Flag, contentDescription = "Report as spam", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         IconButton(onClick = onWhitelist) { Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     HorizontalDivider(modifier = Modifier.padding(start = 36.dp), thickness = 0.5.dp)
@@ -1210,10 +1286,16 @@ private fun SettingsTab(
     isRoleHeld: Boolean,
     smsPermissionGranted: Boolean,
     smsNotificationAccessGranted: Boolean,
+    blockVoipCalls: Boolean,
+    onToggleBlockVoipCalls: (Boolean) -> Unit,
+    silenceMessagingApps: Boolean,
+    onToggleSilenceMessagingApps: (Boolean) -> Unit,
     onRequestCallScreeningRole: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     onRequestSmsNotificationAccess: () -> Unit,
     onExportData: () -> Unit,
+    patterns: List<BlockPattern>,
+    onDismissPattern: (String) -> Unit,
     notificationsEnabled: Boolean,
     onNotificationsToggle: (Boolean) -> Unit,
     notificationIconStyle: String,
@@ -1284,6 +1366,34 @@ private fun SettingsTab(
                             color = if (smsNotificationAccessGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                         )
                     }
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Silence unknown senders on messaging apps",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text("Dismiss WhatsApp and other messaging app notifications from unknown senders",
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = silenceMessagingApps, onCheckedChange = onToggleSilenceMessagingApps,
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Block calls from messaging apps",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.primary)
+                        Text("Block WhatsApp and other VoIP calls when the number is hidden",
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = blockVoipCalls, onCheckedChange = onToggleBlockVoipCalls,
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant, uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
                 }
             }
 
@@ -1387,6 +1497,31 @@ private fun SettingsTab(
                     Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Export CSV")
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
+            Text("Patterns", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.padding(start = 16.dp)) {
+                if (patterns.isEmpty()) {
+                    Text("No patterns yet — block two or more similar numbers and the app learns their shared prefix",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    patterns.forEach { p ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(p.prefix, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                                Text("${p.count} blocked numbers", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { onDismissPattern(p.prefix) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Dismiss pattern", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1778,6 +1913,9 @@ private fun BlockedContent(
     onLongPress: (BlockedCall) -> Unit,
     onClearSelection: () -> Unit,
     onDelete: (List<Long>) -> Unit,
+    labels: Map<String, String>,
+    patterns: List<BlockPattern>,
+    onReportSpam: (BlockedCall) -> Unit,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -1805,11 +1943,14 @@ private fun BlockedContent(
                 byNumber.forEach { (_, calls) ->
                     val first = calls.first()
                     val isSelected = selectedIds.contains(first.id)
+                    val tag = labels[first.phoneNumber]
+                        ?: (if (patterns.any { first.phoneNumber.startsWith(it.prefix) }) "Pattern" else null)
                     item(key = "num_${first.id}") {
                         BlockedCallRow(
                             call = first,
                             frequency = calls.size,
                             isSelected = isSelected,
+                            tag = tag,
                             onWhitelist = { onWhitelist(first) },
                             onTap = {
                                 if (selectionMode) onToggleSelect(first) else selectedCall = first
@@ -1872,11 +2013,14 @@ private fun BlockedContent(
                     Spacer(Modifier.width(12.dp))
                     Text("Call back", style = MaterialTheme.typography.bodyMedium)
                 }
-                // Report spam (stub for now — future keyword/number classification)
-                Row(Modifier.fillMaxWidth().clickable { selectedCall = null }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Report spam — label this number locally
+                Row(Modifier.fillMaxWidth().clickable {
+                    onReportSpam(call)
+                    selectedCall = null
+                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
-                    Text("Report as spam", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Report as spam", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -1971,7 +2115,7 @@ private fun WhitelistRow(number: String, label: String?, onRemove: () -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolean, onWhitelist: () -> Unit, onTap: () -> Unit, onLongPress: () -> Unit) {
+private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolean, tag: String?, onWhitelist: () -> Unit, onTap: () -> Unit, onLongPress: () -> Unit) {
     Row(Modifier.fillMaxWidth()
         .combinedClickable(onClick = onTap, onLongClick = onLongPress)
         .padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1991,6 +2135,13 @@ private fun BlockedCallRow(call: BlockedCall, frequency: Int, isSelected: Boolea
                     Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
                         Text("×$frequency", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                    }
+                }
+                if (tag != null) {
+                    Spacer(Modifier.width(6.dp))
+                    Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFFFF3E0)) {
+                        Text(tag, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                            color = Color(0xFFB45309), modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
                     }
                 }
             }
@@ -2120,10 +2271,15 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
+    "## Features",
+    "Report as spam — label blocked numbers as Spam, Scam, Telemarketer or Promo",
+    "Pattern learning — detects prefixes shared by several blocked numbers",
+    "Silence unknown senders on messaging apps (WhatsApp and others)",
+    "Block calls from messaging apps when the number is hidden",
     "## Fixes",
-    "SMS blocking on Android 11+ — blocked SMS notifications are now dismissed automatically",
-    "New Settings entry to enable notification access for the SMS fallback",
-    "Precise notification dismissal via a blocked-sender registry",
+    "Total Blocked Today now counts calls and SMS together",
+    "Notification count includes today's blocked SMS",
+    "Weekly chart — day blocks separated cleanly",
 )
 
 

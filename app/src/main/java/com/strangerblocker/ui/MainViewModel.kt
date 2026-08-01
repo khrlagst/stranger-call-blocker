@@ -23,6 +23,7 @@ import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.BlockedSms
+import com.strangerblocker.data.NumberLabel
 import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateChecker
 import com.strangerblocker.data.UpdateInfo
@@ -59,6 +60,16 @@ enum class BottomNavTab {
     SMS,
     SETTINGS,
 }
+
+enum class SpamLabel(val display: String) {
+    SPAM("Spam"),
+    SCAM("Scam"),
+    TELEMARKETER("Telemarketer"),
+    PROMO("Promo"),
+}
+
+/** A learned spam pattern — a long prefix shared by several blocked numbers. */
+data class BlockPattern(val prefix: String, val count: Int, val example: String)
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -212,6 +223,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _pendingWhitelistRemoval.value = null
     }
 
+    // ── Number labels (spam reporting) ──
+
+    val numberLabels: Flow<List<NumberLabel>> = db.numberLabelDao().observeAll()
+
+    private val _pendingLabelNumber = MutableStateFlow<String?>(null)
+    val pendingLabelNumber: StateFlow<String?> = _pendingLabelNumber.asStateFlow()
+
+    fun requestLabelNumber(number: String) {
+        _pendingLabelNumber.value = number
+    }
+
+    fun cancelLabelNumber() {
+        _pendingLabelNumber.value = null
+    }
+
+    fun setNumberLabel(number: String, label: SpamLabel) {
+        viewModelScope.launch {
+            db.numberLabelDao().upsert(
+                NumberLabel(
+                    phoneNumber = number,
+                    label = label.name,
+                    updatedAtMillis = System.currentTimeMillis(),
+                )
+            )
+        }
+        _pendingLabelNumber.value = null
+    }
+
     // ── Whitelist add confirm ──
 
     private val _pendingWhitelistConfirm = MutableStateFlow<WhitelistedNumber?>(null)
@@ -294,6 +333,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         else groups.sumOf { g -> g.smsList.count { inRange(it.blockedAtMillis, from, to) } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    // ── Learned block patterns ──
+
+    private val _dismissedPatterns = MutableStateFlow(
+        prefs.getStringSet("dismissed_patterns", emptySet()) ?: emptySet()
+    )
+
+    /** Patterns learned from blocked numbers sharing a long prefix (min support 2). */
+    val patterns: StateFlow<List<BlockPattern>> = combine(blockedCalls, blockedSms, _dismissedPatterns) { calls, sms, dismissed ->
+        val numbers = (calls.map { it.phoneNumber } + sms.map { it.senderNumber }).distinct()
+        detectPatterns(numbers).filterNot { dismissed.contains(it.prefix) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun dismissPattern(prefix: String) {
+        val updated = _dismissedPatterns.value + prefix
+        prefs.edit().putStringSet("dismissed_patterns", updated).apply()
+        _dismissedPatterns.value = updated
+    }
+
     /** Whitelist filtered by [smsSearchQuery] (matches number or label substring). */
     val filteredWhitelistedSms: StateFlow<List<WhitelistedNumber>> = combine(whitelisted, smsSearchQuery) { list, query ->
         if (query.isBlank()) list
@@ -343,6 +400,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val app = getApplication<Application>()
         _smsNotificationAccessGranted.value =
             NotificationManagerCompat.getEnabledListenerPackages(app).contains(app.packageName)
+    }
+
+    private val _silenceMessagingApps = MutableStateFlow(prefs.getBoolean("silence_messaging_apps", false))
+    val silenceMessagingApps: StateFlow<Boolean> = _silenceMessagingApps.asStateFlow()
+
+    fun toggleSilenceMessagingApps(enabled: Boolean) {
+        prefs.edit().putBoolean("silence_messaging_apps", enabled).apply()
+        _silenceMessagingApps.value = enabled
     }
 
     // ── SMS keyword filtering ──
@@ -408,6 +473,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _pendingWhitelistConfirm.value = null
         _pendingWhitelistRemoval.value = null
         _pendingKeywordRemoval.value = null
+        _pendingLabelNumber.value = null
     }
 
     // ── Toggle ──
@@ -432,6 +498,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleBlocking(enabled: Boolean) {
         prefs.edit().putBoolean("blocking_enabled", enabled).apply()
         _isBlockingEnabled.value = enabled
+    }
+
+    // ── VoIP calls from messaging apps (no phone number on the handle) ──
+
+    private val _blockVoipCalls = MutableStateFlow(prefs.getBoolean("block_voip_calls", false))
+    val blockVoipCalls: StateFlow<Boolean> = _blockVoipCalls.asStateFlow()
+
+    fun toggleBlockVoipCalls(enabled: Boolean) {
+        prefs.edit().putBoolean("block_voip_calls", enabled).apply()
+        _blockVoipCalls.value = enabled
     }
 
     // ── Manual block list ──
@@ -559,7 +635,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 cal.set(Calendar.MINUTE, 0)
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
-                val count = db.blockedCallDao().countSince(cal.timeInMillis)
+                val count = db.blockedCallDao().countSince(cal.timeInMillis) + db.blockedSmsDao().countSince(cal.timeInMillis)
                 val intent = Intent(app, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
@@ -845,3 +921,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun inRange(millis: Long, from: Long?, to: Long?): Boolean =
     (from == null || millis >= from) && (to == null || millis <= to)
+
+// A pattern prefix must be long enough to be specific (e.g. "+6285592679"),
+// but not so short it matches a whole carrier range ("+62812").
+private const val MIN_PATTERN_PREFIX_LEN = 8
+private const val MIN_PATTERN_SUPPORT = 2
+
+private fun detectPatterns(numbers: List<String>): List<BlockPattern> {
+    if (numbers.size < MIN_PATTERN_SUPPORT) return emptyList()
+    val found = mutableListOf<BlockPattern>()
+    val seen = mutableSetOf<String>()
+    for (n in numbers) {
+        if (n.length <= MIN_PATTERN_PREFIX_LEN + 1) continue
+        // Longest prefix of this number shared by >= MIN_PATTERN_SUPPORT numbers.
+        var best: BlockPattern? = null
+        for (len in (n.length - 2) downTo MIN_PATTERN_PREFIX_LEN) {
+            val prefix = n.substring(0, len)
+            val matches = numbers.count { it.startsWith(prefix) }
+            if (matches >= MIN_PATTERN_SUPPORT) {
+                best = BlockPattern(prefix, matches, n)
+                break
+            }
+        }
+        best?.let { if (seen.add(it.prefix)) found.add(it) }
+    }
+    return found.sortedByDescending { it.count }
+}

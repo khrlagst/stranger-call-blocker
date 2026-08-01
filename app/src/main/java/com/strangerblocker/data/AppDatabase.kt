@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [BlockedCall::class, WhitelistedNumber::class, BlockedSms::class],
-    version = 4,
+    entities = [BlockedCall::class, WhitelistedNumber::class, BlockedSms::class, NumberLabel::class],
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -17,6 +17,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun blockedCallDao(): BlockedCallDao
     abstract fun whitelistedNumberDao(): WhitelistedNumberDao
     abstract fun blockedSmsDao(): BlockedSmsDao
+    abstract fun numberLabelDao(): NumberLabelDao
 
     companion object {
         @Volatile
@@ -53,6 +54,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS number_labels (
+                        phoneNumber TEXT PRIMARY KEY NOT NULL,
+                        label TEXT NOT NULL,
+                        updatedAtMillis INTEGER NOT NULL
+                    )"""
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room
@@ -61,7 +74,7 @@ abstract class AppDatabase : RoomDatabase() {
                         AppDatabase::class.java,
                         "stranger_blocker.db",
                     )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { INSTANCE = it }
             }
