@@ -1,24 +1,9 @@
 package com.strangerblocker.service
 
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallScreeningService
-import android.app.Notification
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
-import android.graphics.drawable.Icon
-import android.os.Build
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import com.strangerblocker.MainActivity
-import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import kotlinx.coroutines.CoroutineScope
@@ -26,9 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class CallBlockerService : CallScreeningService() {
 
@@ -75,7 +57,7 @@ class CallBlockerService : CallScreeningService() {
                             blockedAtMillis = System.currentTimeMillis(),
                         )
                     )
-                    postBlockedNotification(app)
+                    BlockedNotification.post(app, app.db)
                 }
             } else {
                 respondToCall(details, CallScreeningService.CallResponse.Builder().build())
@@ -108,7 +90,7 @@ class CallBlockerService : CallScreeningService() {
                         blockedAtMillis = System.currentTimeMillis(),
                     )
                 )
-                postBlockedNotification(app)
+                BlockedNotification.post(app, app.db)
             }
             return
         }
@@ -136,9 +118,7 @@ class CallBlockerService : CallScreeningService() {
                         blockedAtMillis = System.currentTimeMillis(),
                     )
                 )
-                // Notification is posted after DB save - uses the shared preference
-                // checked inside postBlockedNotification()
-                postBlockedNotification(app)
+                BlockedNotification.post(app, app.db)
             }
         }
     }
@@ -169,11 +149,6 @@ class CallBlockerService : CallScreeningService() {
         return prefs.getStringSet("manual_blocks", emptySet())?.contains(number) == true
     }
 
-    private fun isNotificationsEnabled(): Boolean {
-        val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
-        return prefs.getBoolean("notifications_enabled", true)
-    }
-
     private fun isWhitelisted(number: String): Boolean {
         return try {
             val db = (applicationContext as StrangerBlockerApp).db
@@ -198,91 +173,5 @@ class CallBlockerService : CallScreeningService() {
         } catch (_: SecurityException) {
             false
         }
-    }
-
-    private fun postBlockedNotification(app: StrangerBlockerApp) {
-        if (!isNotificationsEnabled()) return
-
-        val todayKey = "blocked_today_${todayDate()}"
-        val prefs = getSharedPreferences("stranger_blocker", MODE_PRIVATE)
-
-        val count: Int
-        if (!prefs.contains(todayKey)) {
-            // First notification today: init from DB. The call was already
-            // inserted, so dbCount already includes it — no extra increment.
-            val todayStart = todayStartMillis()
-            val dbCount = runBlocking(Dispatchers.IO) {
-                app.db.blockedCallDao().countSince(todayStart) + app.db.blockedSmsDao().countSince(todayStart)
-            }
-            prefs.edit().putInt(todayKey, dbCount).apply()
-            count = dbCount
-        } else {
-            // Subsequent calls: increment the running counter.
-            count = prefs.getInt(todayKey, 0) + 1
-            prefs.edit().putInt(todayKey, count).apply()
-        }
-
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-
-        val iconStyle = prefs.getString("notification_icon_style", "shield") ?: "shield"
-        val text = count.toString()
-
-        val notification: Notification
-        if (iconStyle == "circle_count") {
-            val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.parseColor("#10B981")
-                style = Paint.Style.FILL
-            }.let { canvas.drawCircle(24f, 24f, 24f, it) }
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.WHITE
-                textAlign = Paint.Align.CENTER
-                textSize = 26f
-                typeface = Typeface.DEFAULT_BOLD
-            }.let { canvas.drawText(text, 24f, 24f + 26f / 3f, it) }
-            val icon = Icon.createWithBitmap(bitmap)
-            notification = Notification.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(icon)
-                .setContentTitle("$text blocked today")
-                .setContentText("Stranger Blocker is active")
-                .setContentIntent(pendingIntent)
-                .build()
-        } else {
-            notification = NotificationCompat.Builder(this, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("$text blocked today")
-                .setContentText("Stranger Blocker is active")
-                .setNumber(count)
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(false)
-                .setSilent(true)
-                .build()
-        }
-
-        NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
-    }
-
-    private fun todayDate(): String {
-        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-    }
-
-    private fun todayStartMillis(): Long {
-        val cal = java.util.Calendar.getInstance()
-        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        cal.set(java.util.Calendar.MINUTE, 0)
-        cal.set(java.util.Calendar.SECOND, 0)
-        cal.set(java.util.Calendar.MILLISECOND, 0)
-        return cal.timeInMillis
-    }
-
-    companion object {
-        private const val NOTIFICATION_ID = 1001
     }
 }

@@ -1,25 +1,15 @@
 package com.strangerblocker.ui
 
 import android.app.Application
-import android.app.Notification
-import android.app.PendingIntent
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.strangerblocker.MainActivity
-import com.strangerblocker.R
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedCall
 import com.strangerblocker.data.BlockedSms
@@ -28,6 +18,7 @@ import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateChecker
 import com.strangerblocker.data.UpdateInfo
 import com.strangerblocker.data.WhitelistedNumber
+import com.strangerblocker.service.BlockedNotification
 import com.strangerblocker.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -630,54 +621,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val app = getApplication<Application>()
         if (enabled) {
             viewModelScope.launch(Dispatchers.IO) {
-                val cal = Calendar.getInstance()
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-                val count = db.blockedCallDao().countSince(cal.timeInMillis) + db.blockedSmsDao().countSince(cal.timeInMillis)
-                val intent = Intent(app, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-                }
-                val pi = PendingIntent.getActivity(
-                    app, 0, intent,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                )
-                val iconStyle = prefs.getString("notification_icon_style", "shield") ?: "shield"
-                val text = count.toString()
-                val notification: Notification
-                if (iconStyle == "circle_count") {
-                    val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(bitmap)
-                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.parseColor("#10B981")
-                        style = Paint.Style.FILL
-                    }.let { canvas.drawCircle(24f, 24f, 24f, it) }
-                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.WHITE
-                        textAlign = Paint.Align.CENTER
-                        textSize = 26f
-                        typeface = Typeface.DEFAULT_BOLD
-                    }.let { canvas.drawText(text, 24f, 24f + 26f / 3f, it) }
-                    val icon = Icon.createWithBitmap(bitmap)
-                    notification = Notification.Builder(app, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-                        .setSmallIcon(icon)
-                        .setContentTitle("$text blocked today")
-                        .setContentText("Stranger Blocker is active")
-                        .setContentIntent(pi)
-                        .build()
-                } else {
-                    notification = NotificationCompat.Builder(app, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-                        .setSmallIcon(R.drawable.ic_notification)
-                        .setContentTitle("$text blocked today")
-                        .setContentText("Stranger Blocker is active")
-                        .setNumber(count)
-                        .setContentIntent(pi)
-                        .setAutoCancel(false)
-                        .setSilent(true)
-                        .build()
-                }
-                NotificationManagerCompat.from(app).notify(1001, notification)
+                BlockedNotification.post(app, db)
             }
         } else {
             NotificationManagerCompat.from(app).cancel(1001)
@@ -856,54 +800,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = app.getSharedPreferences("stranger_blocker", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("notifications_enabled", true)) return
         viewModelScope.launch(Dispatchers.IO) {
-            val cal = Calendar.getInstance()
-            cal.set(Calendar.HOUR_OF_DAY, 0)
-            cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0)
-            cal.set(Calendar.MILLISECOND, 0)
-            val count = db.blockedCallDao().countSince(cal.timeInMillis)
-            val intent = Intent(app, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            val pi = PendingIntent.getActivity(
-                app, 0, intent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-            val iconStyle = prefs.getString("notification_icon_style", "shield") ?: "shield"
-            val text = count.toString()
-            val notification: Notification
-            if (iconStyle == "circle_count") {
-                val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bitmap)
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = android.graphics.Color.parseColor("#10B981")
-                    style = Paint.Style.FILL
-                }.let { canvas.drawCircle(24f, 24f, 24f, it) }
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = android.graphics.Color.WHITE
-                    textAlign = Paint.Align.CENTER
-                    textSize = 26f
-                    typeface = Typeface.DEFAULT_BOLD
-                }.let { canvas.drawText(text, 24f, 24f + 26f / 3f, it) }
-                val icon = Icon.createWithBitmap(bitmap)
-                notification = Notification.Builder(app, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-                    .setSmallIcon(icon)
-                    .setContentTitle("$text blocked today")
-                    .setContentText("Stranger Blocker is active")
-                    .setContentIntent(pi)
-                    .build()
-            } else {
-                notification = NotificationCompat.Builder(app, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle("$text blocked today")
-                    .setContentText("Stranger Blocker is active")
-                    .setNumber(count)
-                    .setContentIntent(pi)
-                    .setAutoCancel(false)
-                    .setSilent(true)
-                    .build()
-            }
-            NotificationManagerCompat.from(app).notify(1001, notification)
+            BlockedNotification.post(app, db)
         }
     }
 

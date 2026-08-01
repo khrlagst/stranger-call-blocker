@@ -515,9 +515,15 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         },
                         blockVoipCalls = blockVoipCalls,
-                        onToggleBlockVoipCalls = viewModel::toggleBlockVoipCalls,
+                        onToggleBlockVoipCalls = { enabled ->
+                            viewModel.toggleBlockVoipCalls(enabled)
+                            Toast.makeText(context, if (enabled) "Calls from messaging apps will be blocked" else "Calls from messaging apps will ring through", Toast.LENGTH_SHORT).show()
+                        },
                         silenceMessagingApps = silenceMessagingApps,
-                        onToggleSilenceMessagingApps = viewModel::toggleSilenceMessagingApps,
+                        onToggleSilenceMessagingApps = { enabled ->
+                            viewModel.toggleSilenceMessagingApps(enabled)
+                            Toast.makeText(context, if (enabled) "Unknown senders on messaging apps will be silenced" else "Messaging app notifications will show normally", Toast.LENGTH_SHORT).show()
+                        },
                         onExportData = { saveCsvLauncher.launch("blocked_calls.csv") },
                         patterns = patterns,
                         onDismissPattern = viewModel::dismissPattern,
@@ -2271,15 +2277,9 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
-    "## Features",
-    "Report as spam — label blocked numbers as Spam, Scam, Telemarketer or Promo",
-    "Pattern learning — detects prefixes shared by several blocked numbers",
-    "Silence unknown senders on messaging apps (WhatsApp and others)",
-    "Block calls from messaging apps when the number is hidden",
     "## Fixes",
-    "Total Blocked Today now counts calls and SMS together",
-    "Notification count includes today's blocked SMS",
-    "Weekly chart — day blocks separated cleanly",
+    "Notification count now refreshes when SMS are blocked — counts calls and SMS together",
+    "Toasts added for the messaging-app and VoIP call toggles",
 )
 
 

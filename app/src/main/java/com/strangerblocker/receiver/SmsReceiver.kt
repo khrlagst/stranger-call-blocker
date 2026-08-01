@@ -8,6 +8,7 @@ import android.provider.Telephony
 import android.telephony.SmsMessage
 import com.strangerblocker.StrangerBlockerApp
 import com.strangerblocker.data.BlockedSms
+import com.strangerblocker.service.BlockedNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -70,6 +71,7 @@ class SmsReceiver : BroadcastReceiver() {
                             blockReason = reason,
                         )
                     )
+                    BlockedNotification.post(context.applicationContext, db)
                 } catch (_: Exception) {
                     // silent
                 }
