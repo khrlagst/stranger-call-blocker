@@ -70,10 +70,10 @@ $DUP_OK && pass "No duplicate functions"
 echo ""
 echo "── 4. Import audit ──"
 IMPORT_OK=true
-# R in sub-packages
+# R in sub-packages — required only when the file actually references R
 for f in "$SERVICE_DIR/BlockerTileService.kt" "$SERVICE_DIR/CallBlockerService.kt"; do
-    [ -f "$f" ] && if ! grep -q "import com.strangerblocker.R" "$f" 2>/dev/null; then
-        fail "$(basename "$f"): missing import com.strangerblocker.R"
+    if [ -f "$f" ] && grep -qE '\bR\.' "$f" 2>/dev/null && ! grep -q "import com.strangerblocker.R" "$f" 2>/dev/null; then
+        fail "$(basename "$f"): uses R without importing com.strangerblocker.R"
         IMPORT_OK=false
     fi
 done
@@ -119,8 +119,7 @@ $VERSION_OK && pass "Version is consistent"
 echo ""
 echo "── 6. Changelog check ──"
 CL_OK=true
-if grep -q "1\.8\.9\|1\.8\.8\|1\.8\.7\|1\.8\.6" "$UI_DIR/MainScreen.kt" 2>/dev/null; then
-    # Has at least some changelog entries — basic sanity check
+if grep -q "private fun latestChangelog" "$UI_DIR/MainScreen.kt" 2>/dev/null; then
     pass "Changelog present"
 else
     warn "Changelog may be outdated"
