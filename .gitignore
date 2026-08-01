@@ -9,6 +9,9 @@
 .cxx
 local.properties
 /app/build
+/sb-engine-core/build
+/sb-engine-android/build
+/sample/build
 ci.keystore
 .omo/
 *.html

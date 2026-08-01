@@ -11,14 +11,17 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.strangerblocker.StrangerBlockerApp
-import com.strangerblocker.data.BlockedCall
-import com.strangerblocker.data.BlockedSms
-import com.strangerblocker.data.NumberLabel
 import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateChecker
 import com.strangerblocker.data.UpdateInfo
-import com.strangerblocker.data.WhitelistedNumber
-import com.strangerblocker.service.BlockedNotification
+import com.strangerblocker.engine.BlockPattern
+import com.strangerblocker.engine.NumberRules
+import com.strangerblocker.engine.PatternLearner
+import com.strangerblocker.engine.SpamLabel
+import com.strangerblocker.engine.data.BlockedCall
+import com.strangerblocker.engine.data.BlockedSms
+import com.strangerblocker.engine.data.NumberLabel
+import com.strangerblocker.engine.data.WhitelistedNumber
 import com.strangerblocker.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,16 +54,6 @@ enum class BottomNavTab {
     SMS,
     SETTINGS,
 }
-
-enum class SpamLabel(val display: String) {
-    SPAM("Spam"),
-    SCAM("Scam"),
-    TELEMARKETER("Telemarketer"),
-    PROMO("Promo"),
-}
-
-/** A learned spam pattern — a long prefix shared by several blocked numbers. */
-data class BlockPattern(val prefix: String, val count: Int, val example: String)
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -153,7 +146,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         else groups.mapNotNull { group ->
             val matched = group.calls.filter {
                 (query.isBlank() || it.phoneNumber.contains(query, ignoreCase = true)) &&
-                    inRange(it.blockedAtMillis, from, to)
+                    NumberRules.inRange(it.blockedAtMillis, from, to)
             }
             if (matched.isEmpty()) null else CallGroup(group.header, matched)
         }
@@ -162,7 +155,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Number of blocked calls matching the date-range filter (0 when no filter active). */
     val callFilterCount: StateFlow<Int> = combine(groupedCalls, callFilterFrom, callFilterTo) { groups, from, to ->
         if (from == null && to == null) 0
-        else groups.sumOf { g -> g.calls.count { inRange(it.blockedAtMillis, from, to) } }
+        else groups.sumOf { g -> g.calls.count { NumberRules.inRange(it.blockedAtMillis, from, to) } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     // ── Whitelist ──
@@ -312,7 +305,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         else groups.mapNotNull { group ->
             val matched = group.smsList.filter {
                 (query.isBlank() || it.senderNumber.contains(query, ignoreCase = true) || it.messageBody.contains(query, ignoreCase = true)) &&
-                    inRange(it.blockedAtMillis, from, to)
+                    NumberRules.inRange(it.blockedAtMillis, from, to)
             }
             if (matched.isEmpty()) null else SmsGroup(group.header, matched)
         }
@@ -321,7 +314,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Number of blocked SMS matching the date-range filter (0 when no filter active). */
     val smsFilterCount: StateFlow<Int> = combine(groupedBlockedSms, smsFilterFrom, smsFilterTo) { groups, from, to ->
         if (from == null && to == null) 0
-        else groups.sumOf { g -> g.smsList.count { inRange(it.blockedAtMillis, from, to) } }
+        else groups.sumOf { g -> g.smsList.count { NumberRules.inRange(it.blockedAtMillis, from, to) } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     // ── Learned block patterns ──
@@ -333,7 +326,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Patterns learned from blocked numbers sharing a long prefix (min support 2). */
     val patterns: StateFlow<List<BlockPattern>> = combine(blockedCalls, blockedSms, _dismissedPatterns) { calls, sms, dismissed ->
         val numbers = (calls.map { it.phoneNumber } + sms.map { it.senderNumber }).distinct()
-        detectPatterns(numbers).filterNot { dismissed.contains(it.prefix) }
+        PatternLearner.learn(numbers).filterNot { dismissed.contains(it.prefix) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun dismissPattern(prefix: String) {
@@ -621,7 +614,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val app = getApplication<Application>()
         if (enabled) {
             viewModelScope.launch(Dispatchers.IO) {
-                BlockedNotification.post(app, db)
+                (app as StrangerBlockerApp).engine.postBlockedCountNotification()
             }
         } else {
             NotificationManagerCompat.from(app).cancel(1001)
@@ -800,7 +793,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = app.getSharedPreferences("stranger_blocker", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("notifications_enabled", true)) return
         viewModelScope.launch(Dispatchers.IO) {
-            BlockedNotification.post(app, db)
+            (app as StrangerBlockerApp).engine.postBlockedCountNotification()
         }
     }
 
@@ -814,33 +807,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkForUpdates()
         maybePostNotification()
     }
-}
-
-private fun inRange(millis: Long, from: Long?, to: Long?): Boolean =
-    (from == null || millis >= from) && (to == null || millis <= to)
-
-// A pattern prefix must be long enough to be specific (e.g. "+6285592679"),
-// but not so short it matches a whole carrier range ("+62812").
-private const val MIN_PATTERN_PREFIX_LEN = 8
-private const val MIN_PATTERN_SUPPORT = 2
-
-private fun detectPatterns(numbers: List<String>): List<BlockPattern> {
-    if (numbers.size < MIN_PATTERN_SUPPORT) return emptyList()
-    val found = mutableListOf<BlockPattern>()
-    val seen = mutableSetOf<String>()
-    for (n in numbers) {
-        if (n.length <= MIN_PATTERN_PREFIX_LEN + 1) continue
-        // Longest prefix of this number shared by >= MIN_PATTERN_SUPPORT numbers.
-        var best: BlockPattern? = null
-        for (len in (n.length - 2) downTo MIN_PATTERN_PREFIX_LEN) {
-            val prefix = n.substring(0, len)
-            val matches = numbers.count { it.startsWith(prefix) }
-            if (matches >= MIN_PATTERN_SUPPORT) {
-                best = BlockPattern(prefix, matches, n)
-                break
-            }
-        }
-        best?.let { if (seen.add(it.prefix)) found.add(it) }
-    }
-    return found.sortedByDescending { it.count }
 }

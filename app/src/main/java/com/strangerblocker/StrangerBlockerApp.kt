@@ -3,13 +3,25 @@ package com.strangerblocker
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import com.strangerblocker.data.AppDatabase
+import com.strangerblocker.engine.EngineConfig
+import com.strangerblocker.engine.NotificationConfig
+import com.strangerblocker.engine.SbEngine
+import com.strangerblocker.engine.data.AppDatabase
 
 class StrangerBlockerApp : Application() {
 
     val db: AppDatabase by lazy {
         AppDatabase.getInstance(this)
     }
+
+    /** The on-device blocking engine, shared by all framework adapters. */
+    val engine: SbEngine by lazy {
+        SbEngine(this, EngineConfig("stranger_blocker"), notificationConfig())
+    }
+
+    /** Notification pieces the engine needs, wired to this app's resources. */
+    fun notificationConfig(): NotificationConfig =
+        NotificationConfig(R.drawable.ic_notification, NOTIFICATION_CHANNEL_ID)
 
     override fun onCreate() {
         super.onCreate()

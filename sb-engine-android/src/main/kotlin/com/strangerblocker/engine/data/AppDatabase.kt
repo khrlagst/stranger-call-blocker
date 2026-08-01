@@ -1,4 +1,5 @@
-package com.strangerblocker.data
+// SPDX-License-Identifier: Apache-2.0
+package com.strangerblocker.engine.data
 
 import android.content.Context
 import androidx.room.Database

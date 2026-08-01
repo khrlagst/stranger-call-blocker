@@ -115,11 +115,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.strangerblocker.data.BlockedCall
-import com.strangerblocker.data.BlockedSms
 import com.strangerblocker.data.UpdateCheckResult
 import com.strangerblocker.data.UpdateInfo
-import com.strangerblocker.data.WhitelistedNumber
+import com.strangerblocker.engine.BlockPattern
+import com.strangerblocker.engine.SpamLabel
+import com.strangerblocker.engine.data.BlockedCall
+import com.strangerblocker.engine.data.BlockedSms
+import com.strangerblocker.engine.data.WhitelistedNumber
 import com.strangerblocker.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

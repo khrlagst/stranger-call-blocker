@@ -1,4 +1,5 @@
-package com.strangerblocker.service
+// SPDX-License-Identifier: Apache-2.0
+package com.strangerblocker.engine
 
 import android.app.Notification
 import android.app.PendingIntent
@@ -11,24 +12,28 @@ import android.graphics.Typeface
 import android.graphics.drawable.Icon
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.strangerblocker.MainActivity
-import com.strangerblocker.R
-import com.strangerblocker.StrangerBlockerApp
-import com.strangerblocker.data.AppDatabase
+import com.strangerblocker.engine.data.AppDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.util.Calendar
 
+/** Host-provided pieces for the daily blocked-count notification. */
+class NotificationConfig(
+    val smallIconRes: Int,
+    val channelId: String,
+)
+
 /**
  * Posts the daily blocked-count notification. Count is always derived from
- * the DB (calls + SMS) so the badge can never drift from reality.
+ * the DB (calls + SMS) so the badge can never drift from reality. The launch
+ * intent is resolved from the host package so the engine has no app coupling.
  */
 object BlockedNotification {
 
     private const val NOTIFICATION_ID = 1001
 
-    fun post(context: Context, db: AppDatabase) {
-        val prefs = context.getSharedPreferences("stranger_blocker", Context.MODE_PRIVATE)
+    fun post(context: Context, db: AppDatabase, config: NotificationConfig, prefsName: String) {
+        val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
         if (!prefs.getBoolean("notifications_enabled", true)) return
 
         val todayStart = run {
@@ -44,13 +49,13 @@ object BlockedNotification {
         }
         val text = count.toString()
 
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context, 0, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val pendingIntent = if (launchIntent != null) {
+            PendingIntent.getActivity(
+                context, 0, launchIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+        } else null
 
         val iconStyle = prefs.getString("notification_icon_style", "shield") ?: "shield"
         val notification: Notification =
@@ -67,15 +72,15 @@ object BlockedNotification {
                     textSize = 26f
                     typeface = Typeface.DEFAULT_BOLD
                 }.let { canvas.drawText(text, 24f, 24f + 26f / 3f, it) }
-                Notification.Builder(context, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
+                Notification.Builder(context, config.channelId)
                     .setSmallIcon(Icon.createWithBitmap(bitmap))
                     .setContentTitle("$text blocked today")
                     .setContentText("Stranger Blocker is active")
                     .setContentIntent(pendingIntent)
                     .build()
             } else {
-                NotificationCompat.Builder(context, StrangerBlockerApp.NOTIFICATION_CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_notification)
+                NotificationCompat.Builder(context, config.channelId)
+                    .setSmallIcon(config.smallIconRes)
                     .setContentTitle("$text blocked today")
                     .setContentText("Stranger Blocker is active")
                     .setNumber(count)

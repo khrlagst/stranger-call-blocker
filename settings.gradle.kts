@@ -16,3 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "StrangerCallBlocker"
 include(":app")
+include(":sb-engine-core")
+include(":sb-engine-android")
+include(":sample")
