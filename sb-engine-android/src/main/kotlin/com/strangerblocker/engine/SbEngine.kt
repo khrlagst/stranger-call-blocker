@@ -109,8 +109,11 @@ class SbEngine(
 
     // ── Notification dismissal (Android 11+ fallback) ──
 
+    fun isSmsBlockingEnabled(): Boolean = smsBlockingEnabled()
+
     fun shouldDismissNotification(title: String?, fromDefaultSmsApp: Boolean): Boolean {
         val sender = title?.trim() ?: return false
+        if (registry.isRecentlyBlocked(sender)) return true
         if (fromDefaultSmsApp) {
             return smsBlockingEnabled() && registry.isRecentlyBlocked(sender)
         }

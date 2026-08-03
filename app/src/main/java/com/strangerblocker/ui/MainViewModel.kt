@@ -57,6 +57,12 @@ enum class BottomNavTab {
     SETTINGS,
 }
 
+data class RecentActivity(
+    val number: String,
+    val timeMillis: Long,
+    val isSms: Boolean,
+)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs: SharedPreferences =
@@ -103,17 +109,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val recentBlocked: StateFlow<List<BlockedCall>> = blockedCalls.map { it.take(5) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Daily counts for the last 7 days — 0=Monday .. 6=Sunday. */
-    val weeklyCounts: StateFlow<List<Int>> = blockedCalls.map { calls ->
+    /** Offset of the week shown on the dashboard chart: 0 = current week, negative = past. */
+    private val _weekOffset = MutableStateFlow(0)
+    val weekOffset: StateFlow<Int> = _weekOffset.asStateFlow()
+
+    private fun weekStartMillis(offset: Int): Long {
         val cal = Calendar.getInstance()
         val nowMillis = cal.timeInMillis
-        // Compute day-of-week index for each of the last 7 days (Mon=0..Sun=6)
         val todayDoy = cal.get(Calendar.DAY_OF_WEEK)
         val monOffset = (todayDoy - Calendar.MONDAY + 7) % 7
         val midnightToday = nowMillis - (cal.get(Calendar.HOUR_OF_DAY) * 3600000L
             + cal.get(Calendar.MINUTE) * 60000L + cal.get(Calendar.SECOND) * 1000L
             + cal.get(Calendar.MILLISECOND))
-        val dayStart = midnightToday - monOffset * 86400000L
+        return midnightToday - monOffset * 86400000L + offset.toLong() * 7L * 86400000L
+    }
+
+    fun shiftWeek(delta: Int) { _weekOffset.value += delta }
+
+    fun resetWeek() { _weekOffset.value = 0 }
+
+    val weeklyCounts: StateFlow<List<Int>> = combine(blockedCalls, _weekOffset) { calls, offset ->
+        val dayStart = weekStartMillis(offset)
         val buckets = LongArray(7) { dayStart + it * 86400000L }
         val counts = IntArray(7)
         for (call in calls) {
@@ -273,6 +289,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val blockedSms: Flow<List<BlockedSms>> = db.blockedSmsDao().observeAll()
 
+    /** Last 5 blocked entries across calls and SMS, newest first. */
+    val recentActivity: StateFlow<List<RecentActivity>> = combine(blockedCalls, blockedSms) { calls, smsList ->
+        (calls.map { RecentActivity(it.phoneNumber, it.blockedAtMillis, isSms = false) } +
+            smsList.map { RecentActivity(it.senderNumber, it.blockedAtMillis, isSms = true) })
+            .sortedByDescending { it.timeMillis }
+            .take(5)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val groupedBlockedSms: StateFlow<List<SmsGroup>> = blockedSms.map { smsList ->
         val cal = Calendar.getInstance()
         val today = cal.get(Calendar.DAY_OF_YEAR)
@@ -326,11 +350,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     /** Patterns learned from blocked numbers sharing a long prefix (min support 2). */
-    val patterns: StateFlow<List<BlockPattern>> = combine(blockedCalls, blockedSms, _dismissedPatterns) { calls, sms, dismissed ->
+    val patterns: StateFlow<List<BlockPattern>> = combine(blockedCalls, blockedSms, numberLabels, _dismissedPatterns) { calls, sms, labeled, dismissed ->
         val numbers = (calls.map { it.phoneNumber } + sms.map { it.senderNumber })
             .distinct()
             .filter { NumberRules.isPhoneNumberShape(it) }
-        PatternLearner.learn(numbers).filterNot { dismissed.contains(it.prefix) }
+        val learned = PatternLearner.learn(numbers).filterNot { dismissed.contains(it.prefix) }
+        learned.map { pattern ->
+            val label = labeled.firstOrNull { it.phoneNumber.startsWith(pattern.prefix) }?.label
+            if (label != null) pattern.copy(label = label) else pattern
+        }
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -350,16 +378,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Daily SMS counts for the last 7 days — 0=Monday .. 6=Sunday. */
-    val weeklySmsCounts: StateFlow<List<Int>> = blockedSms.map { smsList ->
-        val cal = Calendar.getInstance()
-        val nowMillis = cal.timeInMillis
-        val todayDoy = cal.get(Calendar.DAY_OF_WEEK)
-        val monOffset = (todayDoy - Calendar.MONDAY + 7) % 7
-        val midnightToday = nowMillis - (cal.get(Calendar.HOUR_OF_DAY) * 3600000L
-            + cal.get(Calendar.MINUTE) * 60000L + cal.get(Calendar.SECOND) * 1000L
-            + cal.get(Calendar.MILLISECOND))
-        val dayStart = midnightToday - monOffset * 86400000L
+    val weeklySmsCounts: StateFlow<List<Int>> = combine(blockedSms, _weekOffset) { smsList, offset ->
+        val dayStart = weekStartMillis(offset)
         val buckets = LongArray(7) { dayStart + it * 86400000L }
         val counts = IntArray(7)
         for (sms in smsList) {
@@ -444,6 +464,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun resetUiState() {
         bottomNavTab.value = BottomNavTab.DASHBOARD
         selectedTab.value = Tab.BLOCKED
+        _weekOffset.value = 0
         searchQuery.value = ""
         smsSearchQuery.value = ""
         callFilterFrom.value = null

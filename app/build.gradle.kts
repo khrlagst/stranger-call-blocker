@@ -25,8 +25,8 @@ android {
         applicationId = "com.strangerblocker"
         minSdk = 29
         targetSdk = 35
-        versionCode = 68
-        versionName = "2.1.2"
+        versionCode = 69
+        versionName = "2.1.3"
     }
 
     // Signing is conditional: with credentials (CI secrets or local.properties)

@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.pager.HorizontalPager
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -41,6 +43,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ClearAll
@@ -102,6 +106,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -127,9 +132,10 @@ import com.strangerblocker.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.Calendar
+import kotlin.math.roundToInt
 
 
 
@@ -174,6 +180,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val previewUpdates by viewModel.previewUpdates.collectAsState()
     val weeklyCounts by viewModel.weeklyCounts.collectAsState()
     val weeklySmsCounts by viewModel.weeklySmsCounts.collectAsState()
+    val weekOffset by viewModel.weekOffset.collectAsState()
+    val recentActivity by viewModel.recentActivity.collectAsState()
     val callFilterFrom by viewModel.callFilterFrom.collectAsState()
     val callFilterTo by viewModel.callFilterTo.collectAsState()
     val callFilterCount by viewModel.callFilterCount.collectAsState()
@@ -407,7 +415,9 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         totalSmsBlocked = totalSmsBlocked,
                         weeklyCounts = weeklyCounts,
                         weeklySmsCounts = weeklySmsCounts,
-                        recentBlocked = recentBlocked,
+                        weekOffset = weekOffset,
+                        recentActivity = recentActivity,
+                        onShiftWeek = viewModel::shiftWeek,
                         onQuickWhitelist = { call ->
                             if (whitelisted.any { it.phoneNumber == call.phoneNumber }) {
                                 Toast.makeText(context, "Already on the whitelist", Toast.LENGTH_SHORT).show()
@@ -568,13 +578,26 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             )
         }
 
-        // Floating action button — quick actions on Dashboard / Calls / SMS
+        // Floating action button — draggable so it never hides bottom content.
         if (bottomNavTab != BottomNavTab.SETTINGS) {
-            Box(Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 96.dp)) {
+            var fabOffset by remember { mutableStateOf(IntOffset.Zero) }
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset { fabOffset }
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(end = 16.dp, bottom = 96.dp),
+            ) {
                 FloatingActionButton(
                     onClick = { showFabOptions = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            fabOffset = fabOffset + IntOffset(dragAmount.x.roundToInt(), dragAmount.y.roundToInt())
+                        }
+                    },
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Quick actions")
                 }
@@ -779,7 +802,9 @@ private fun DashboardScreen(
     totalSmsBlocked: Int,
     weeklyCounts: List<Int>,
     weeklySmsCounts: List<Int>,
-    recentBlocked: List<BlockedCall>,
+    weekOffset: Int,
+    recentActivity: List<RecentActivity>,
+    onShiftWeek: (Int) -> Unit,
     onQuickWhitelist: (BlockedCall) -> Unit,
 ) {
     val todayCount = groupedCalls.firstOrNull { it.header == "Today" }?.calls?.size ?: 0
@@ -789,7 +814,8 @@ private fun DashboardScreen(
     val totalTodayCount = todayCount + todaySmsCount
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
+            .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
         Spacer(Modifier.height(16.dp))
 
@@ -858,9 +884,19 @@ private fun DashboardScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("Weekly Activity",
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(weekDateRange(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Weekly Activity",
+                            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(weekDateRange(weekOffset), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                    }
+                    IconButton(onClick = { onShiftWeek(-1) }, enabled = weekOffset > -52) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous week", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { onShiftWeek(1) }, enabled = weekOffset < 0) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next week", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
 
                 // Chart legend — calls (emerald) vs SMS (light emerald)
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -923,8 +959,8 @@ private fun DashboardScreen(
         }
         Spacer(Modifier.height(12.dp))
 
-        // Recent Activity — last 5 blocked calls (dense)
-        if (recentBlocked.isNotEmpty()) {
+        // Recent Activity — last 5 blocked calls/SMS (dense)
+        if (recentActivity.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -934,15 +970,34 @@ private fun DashboardScreen(
                 Column(Modifier.padding(16.dp)) {
                     Text("Recent Activity", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.05.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(6.dp))
-                    recentBlocked.forEach { call ->
+                    recentActivity.forEach { item ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(call.phoneNumber, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(relativeTime(call.blockedAtMillis), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 6.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        if (item.isSms) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                    )
+                                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                            ) {
+                                Text(if (item.isSms) "SMS" else "Calls",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                    color = if (item.isSms) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary)
                             }
-                            if (NumberRules.isPhoneNumberShape(call.phoneNumber)) {
-                                IconButton(onClick = { onQuickWhitelist(call) }) {
-                                    Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            Column(Modifier.weight(1f)) {
+                                Text(item.number, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(relativeTime(item.timeMillis), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (!item.isSms && NumberRules.isPhoneNumberShape(item.number)) {
+                                val call = groupedCalls.asSequence()
+                                    .flatMap { it.calls }
+                                    .firstOrNull { it.phoneNumber == item.number && it.blockedAtMillis == item.timeMillis }
+                                if (call != null) {
+                                    IconButton(onClick = { onQuickWhitelist(call) }) {
+                                        Icon(Icons.Default.PersonAdd, contentDescription = "Whitelist", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                    }
                                 }
                             }
                         }
@@ -989,7 +1044,7 @@ private fun CallsContent(
         if (newTab != selectedTab) onSelectTab(newTab)
     }
 
-    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 100.dp)) {
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars).padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 100.dp)) {
         TabBar(
             pagerState = pagerState,
             selectedTab = selectedTab,
@@ -1101,7 +1156,7 @@ private fun SmsScreen(
         if (newTab != selectedTab) onSelectTab(newTab)
     }
 
-    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 100.dp)) {
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars).padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 100.dp)) {
         TabBar(
             pagerState = pagerState,
             selectedTab = selectedTab,
@@ -1213,7 +1268,7 @@ private fun SmsBlockedContent(
                 }
                 items(group.smsList, key = { it.id }) { sms ->
                     val tag = labels[sms.senderNumber]
-                        ?: (if (patterns.any { sms.senderNumber.startsWith(it.prefix) }) "Pattern" else null)
+                        ?: patterns.firstOrNull { sms.senderNumber.startsWith(it.prefix) }?.let { it.label ?: "Pattern" }
                     BlockedSmsRow(
                         sms = sms,
                         isSelected = selectedSmsIds.contains(sms.id),
@@ -1526,7 +1581,10 @@ private fun SettingsTab(
                         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(p.prefix, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
-                                Text("${p.count} blocked numbers", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    if (p.label != null) "${p.count} blocked numbers · ${p.label}" else "${p.count} blocked numbers",
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                             IconButton(onClick = { onDismissPattern(p.prefix) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Dismiss pattern", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1955,7 +2013,7 @@ private fun BlockedContent(
                     val first = calls.first()
                     val isSelected = selectedIds.contains(first.id)
                     val tag = labels[first.phoneNumber]
-                        ?: (if (patterns.any { first.phoneNumber.startsWith(it.prefix) }) "Pattern" else null)
+                        ?: patterns.firstOrNull { first.phoneNumber.startsWith(it.prefix) }?.let { it.label ?: "Pattern" }
                     item(key = "num_${first.id}") {
                         BlockedCallRow(
                             call = first,
@@ -2266,11 +2324,11 @@ private fun ClearHistoryDialog(total: Int, noun: String, onDismiss: () -> Unit, 
     )
 }
 
-private fun weekDateRange(): String {
+private fun weekDateRange(offset: Int): String {
     val cal = java.util.Calendar.getInstance()
     val today = cal.get(java.util.Calendar.DAY_OF_WEEK)
     val monOffset = (today - java.util.Calendar.MONDAY + 7) % 7
-    cal.add(java.util.Calendar.DAY_OF_YEAR, -monOffset)
+    cal.add(java.util.Calendar.DAY_OF_YEAR, -monOffset + offset * 7)
     val fmt = SimpleDateFormat("MMM d", Locale.getDefault())
     val start = fmt.format(cal.time)
     cal.add(java.util.Calendar.DAY_OF_YEAR, 6)
@@ -2289,13 +2347,15 @@ private fun relativeTime(millis: Long): String {
 }
 
 private fun latestChangelog(): List<String> = listOf(
+    "## What's new",
+    "Weekly Activity chart now navigates to previous weeks",
+    "Recent Activity lists blocked calls and SMS with type badges",
+    "Learned patterns inherit your spam label — one report labels the whole pattern",
+    "Quick Settings tile now pauses and resumes blocking like the top bar",
+    "Floating action button is draggable so it never hides your data",
     "## Fixes",
-    "Updates are now signature-verified before installing",
-    "Private-number calls are logged and counted in blocked history",
-    "Disabling or pausing blocking now lets private calls through",
-    "SMS history is pruned after 30 days",
-    "SMS blocking runs off the main thread — no more stalls on slow devices",
-    "Whitelist and contact lookups fail open — a transient error never blocks a known contact",
+    "Bottom content is no longer clipped behind the nav bar on 3-button navigation",
+    "Blocked SMS notifications are dismissed even when the app is mid-launch",
 )
 
 

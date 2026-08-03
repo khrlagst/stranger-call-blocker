@@ -8,6 +8,7 @@ import com.strangerblocker.StrangerBlockerApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -37,6 +38,14 @@ class SmsNotificationListener : NotificationListenerService() {
         scope.launch {
             if (engine.shouldDismissNotification(title?.toString(), fromDefaultSmsApp)) {
                 cancelNotification(sbn.key)
+            } else if (fromDefaultSmsApp && engine.isSmsBlockingEnabled()) {
+                // The receiver records the blocked sender only after slow whitelist
+                // and contacts lookups, so the messaging app can post its notification
+                // before the registry entry lands. Re-check briefly to close the race.
+                delay(500)
+                if (engine.shouldDismissNotification(title?.toString(), true)) {
+                    cancelNotification(sbn.key)
+                }
             }
         }
     }

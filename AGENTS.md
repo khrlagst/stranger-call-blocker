@@ -37,6 +37,15 @@ Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)
 Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>
 ```
 
+## Release & CI Recovery
+
+- After pushing a release tag, **monitor the CI build**. Do not continue to the next task until the tagged build succeeds.
+- If the CI build for a tagged release **fails**:
+  1. **Delete the tag** both locally and on origin: `git tag -d vX.Y.Z` then `git push origin :refs/tags/vX.Y.Z`.
+  2. **Fix the issue** and commit + push the fix on `main` as usual.
+  3. **Re-tag with the same version number** (`vX.Y.Z`) and push it again. **Do NOT bump into the next iteration** — the fix belongs under the current version's tag.
+  - Note: the CI workflow already deletes any existing release for a tag before creating it (`gh release delete ... --yes`), so re-pushing the same tag will not hit "a release with the same tag already exists" (catalog #12).
+
 ## Pre-Commit Quality Gate
 
 Before any `git commit`, run this checklist:
